@@ -416,18 +416,18 @@ def white_diagonal_movement(x, y):
 def black_diagonal_movement(x, y):
     # diagonal movement to the top left(-x, -y)
     for j in range(1, 8):
-        new_x, new_y = x - j, y - j
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
+        new_x, new_y = x - j, y - j     # moving x up and y left
+        if 0 <= new_x < 8 and 0 <= new_y < 8:       # checking that x and y are within the chessboard
             print(f"Checking position: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
-            if chess_board[new_x][new_y] == 0:
+            if chess_board[new_x][new_y] == 0:      # checking for an empty square
                 black_legal_moves.append([new_x, new_y])
-                print(f"empty square: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
-            elif 0 < chess_board[new_x][new_y] < 7:
+                print(f"Empty square: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
+            elif 0 < chess_board[new_x][new_y] < 7:        # checking for a white piece to take
                 black_legal_moves.append([new_x, new_y])
                 print(f"Captured at: {new_x}, {new_y}")
-                break
-            else:
-                print(f"Blocked at: {new_x}, {new_y}")
+                break        # breaking after taking the piece
+            else:       # last possibility is a friendly piece, so the function breaks
+                print(f"Friendly piece at: {new_x}, {new_y}")
                 break
     # diagonal movement to the top right(-x, +y)
     for k in range(1, 8):
