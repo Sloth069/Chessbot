@@ -1,12 +1,12 @@
 """
-1   br   bh   bb   bk   bq   bb   bh   br                1   2   3   4   5   6   7   8
+1   br   bn   bb   bk   bq   bb   bn   br                1   2   3   4   5   6   7   8
 2   bp   bp   bp   bp   bp   bp   bp   bp                9  10  11  12  13  14  15  16
 3   0    0    0    0    0    0    0    0                17  18  19  20  21  22  23  24
 4   0    0    0    0    0    0    0    0                25  26  27  28  29  30  31  32
 5   0    0    0    0    0    0    0    0                33  34  35  36  37  38  39  40
 6   0    0    0    0    0    0    0    0                41  42  43  44  45  46  47  48
 7   wp   wp   wp   wp   wp   wp   wp   wp               49  50  51  52  53  54  55  56
-8   wr   wh   wb   wk   wq   wb   wh   wr               57  58  59  60  61  62  63  64
+8   wr   wn   wb   wk   wq   wb   wn   wr               57  58  59  60  61  62  63  64
     A    B    C    D    E    F    G    H
 
 1. Create array representing chess board
@@ -30,14 +30,14 @@ black_legal_moves = []
 
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
-chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
-               [0, 0, 7, 7, 7, 7, 7, 7],
+chess_board = [[0, 1, 0, 0, 0, 0, 0, 0],
+               [0, 0, 1, 1, 7, 0, 0, 0],
+               [0, 0, 1, 10, 7, 0, 0, 0],
+               [0, 0, 7, 1, 7, 0, 0, 0],
+               [7, 0, 0, 0, 0, 0, 0, 0],
                [0, 7, 0, 0, 0, 0, 0, 0],
-               [0, 7, 0, 0, 0, 0, 0, 0],
-               [0, 2, 0, 0, 0, 0, 0, 0],
-               [0, 1, 0, 0, 0, 0, 0, 0],
-               [1, 0, 1, 1, 1, 1, 1, 1],
-               [2, 3, 4, 5, 6, 4, 3, 2]]
+               [0, 0, 1, 0, 1, 1, 1, 1],
+               [0, 3, 4, 0, 6, 4, 3, 2]]
 '''chess_board = [[0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 8, 0, 0],
                [0, 0, 0, 0, 1, 0, 0, 0],
@@ -96,6 +96,7 @@ def iterate_black_pieces(chess_board):
 def execute_white_move(piece, x, y, new_x, new_y):
     global white_legal_moves
     global current_piece_pos
+    iterate_white_pieces(chess_board)
     if not white_legal_moves:
         print("no legal moves allowed for white")
         return
@@ -114,6 +115,7 @@ def execute_white_move(piece, x, y, new_x, new_y):
 def execute_black_move(piece, x, y, new_x, new_y):
     global black_legal_moves
     global current_piece_pos
+    iterate_black_pieces(chess_board)
     if not black_legal_moves:
         print("no legal moves allowed for black")
         return
@@ -207,7 +209,6 @@ def get_black_legal_moves(piece, x, y):
 
 
 def white_pawn_movement(chess_board, x, y):
-    global white_legal_moves
     if x > 0:
         # moving forward if space ahead is empty
         if chess_board[x - 1][y] == 0:
@@ -216,233 +217,267 @@ def white_pawn_movement(chess_board, x, y):
         if x == 6 and chess_board[x - 1][y] == 0 and chess_board[x - 2][y] == 0:
             white_legal_moves.append([x - 2, y])
         # capturing the piece diagonally right
-        if y < 7 and chess_board[x - 1][y + 1] in b_piece_dict.values():
+        if y < 7 and 6 < chess_board[x - 1][y + 1] < 13:
             white_legal_moves.append([x - 1, y + 1])
         # Capturing the piece diagonally left
-        if y > 0 and chess_board[x - 1][y - 1] in b_piece_dict.values():
+        if y > 0 and 6 < chess_board[x - 1][y - 1] < 13:
             white_legal_moves.append([x - 1, y - 1])
 
 
 def black_pawn_movement(x, y):
-    global black_legal_moves
     if x > 0:
         # moving forward if space ahead is empty
-        if chess_board[x - 1][y] == 0:
-            black_legal_moves.append([x - 1, y])
+        if chess_board[x + 1][y] == 0:
+            black_legal_moves.append([x + 1, y])
         # moving forward 2 spaces if in original position and both are empty
-        if x == 6 and chess_board[x - 1][y] == 0 and chess_board[x - 2][y] == 0:
-            black_legal_moves.append([x - 2, y])
+        if x == 6 and chess_board[x + 1][y] == 0 and chess_board[x + 2][y] == 0:
+            black_legal_moves.append([x + 2, y])
         # capturing the piece diagonally right
-        if y < 7 and chess_board[x - 1][y + 1] in w_piece_dict.values():
-            black_legal_moves.append([x - 1, y + 1])
+        if y < 7 and 0 < chess_board[x + 1][y + 1] < 7:
+            black_legal_moves.append([x + 1, y + 1])
         # Capturing the piece diagonally left
-        if y > 0 and chess_board[x - 1][y - 1] in w_piece_dict.values():
-            black_legal_moves.append([x - 1, y - 1])
+        if y > 0 and 0 < chess_board[x + 1][y - 1] < 7:
+            black_legal_moves.append([x + 1, y - 1])
 
 
 def white_knight_movement(x, y):
-    global white_legal_moves
     knight_moves = ((1, 2), (-1, 2), (1, -2), (-1, -2), (2, 1), (-2, 1), (2, -1), (-2, -1))
     for (j, k) in knight_moves:
         if 7 >= x + j >= 0 and 7 >= y + k >= 0:
-            if chess_board[x + j][y + k] not in w_piece_dict.values():
+            if chess_board[x + j][y + k] == 0:
+                white_legal_moves.append([x + j, y + k])
+            elif 6 < chess_board[x + j][y + k] < 13:
                 white_legal_moves.append([x + j, y + k])
 
 
 def black_knight_movement(x, y):
-    global black_legal_moves
     knight_moves = ((1, 2), (-1, 2), (1, -2), (-1, -2), (2, 1), (-2, 1), (2, -1), (-2, -1))
     for (j, k) in knight_moves:
         if 7 >= x + j >= 0 and 7 >= y + k >= 0:
-            if chess_board[x + j][y + k] not in b_piece_dict.values():
+            if chess_board[x + j][y + k] == 0:
+                black_legal_moves.append([x + j, y + k])
+            elif 0 < chess_board[x + j][y + k] < 7:
                 black_legal_moves.append([x + j, y + k])
 
 
 def white_horizontal_movement(x, y):
-    global white_legal_moves
-    for j in range(y):
-        if chess_board[x][y - j - 1] == 0:
-            white_legal_moves.append([x, y - j - 1])
-        if chess_board[x][y - j - 1] in w_piece_dict.values():
-            break
-        if chess_board[x][y - j - 1] in b_piece_dict.values():
-            white_legal_moves.append([x, y - j - 1])
-            break
-    for k in range(7 - y):
-        if chess_board[x][y + k + 1] == 0:
-            white_legal_moves.append([x, y + k + 1])
-        if chess_board[x][y + k + 1] in w_piece_dict.values():
-            break
-        if chess_board[x][y + k + 1] in b_piece_dict.values():
-            white_legal_moves.append([x, y + k + 1])
-            break
-# horizontal movement function for white queen, rook
+    # horizontal movement to the right:
+    for j in range(1, 8 - y):
+        new_y = y + j
+        if 0 <= new_y < 8:
+            # checking for empty squares:
+            if chess_board[x][new_y] == 0:
+                white_legal_moves.append([x, new_y])
+            # checking for squares with opposing pieces:
+            elif 6 < chess_board[x][new_y] < 13:
+                white_legal_moves.append([x, new_y])
+                break
+            # breaking the function when the only option is for a friendly piece to be ahead
+            else:
+                break
+
+    # horizontal movement to the left:
+    for k in range(1, y + 1):
+        new_y = y - k
+        if 0 <= new_y < 8:
+            if chess_board[x][new_y] == 0:
+                white_legal_moves.append([x, new_y])
+            elif 6 < chess_board[x][new_y] < 13:
+                white_legal_moves.append([x, new_y])
+                break
+            else:
+                break
 
 
 def black_horizontal_movement(x, y):
-    global black_legal_moves
-    global current_piece_pos
-    for j in range(y):
-        if chess_board[x][y - j - 1] == 0:
-            black_legal_moves.append([x, y - j - 1])
-        if chess_board[x][y - j - 1] in b_piece_dict.values():
-            break
-        if chess_board[x][y - j - 1] in w_piece_dict.values():
-            black_legal_moves.append([x, y - j - 1])
-            break
-    for k in range(7 - y):
-        if chess_board[x][y + k + 1] == 0:
-            black_legal_moves.append([x, y + k + 1])
-        if chess_board[x][y + k + 1] in b_piece_dict.values():
-            break
-        if chess_board[x][y + k + 1] in w_piece_dict.values():
-            black_legal_moves.append([x, y + k + 1])
-            break
-# horizontal movement function for black queen, rook
+    # horizontal movement to the right:
+    for j in range(1, 8 - y):
+        new_y = y + j
+        if 0 <= new_y < 8:
+            # checking for empty squares:
+            if chess_board[x][new_y] == 0:
+                black_legal_moves.append([x,new_y])
+            # checking for squares with opposing pieces:
+            elif 0 < chess_board[x][new_y] < 7:
+                black_legal_moves.append([x, new_y])
+                break
+            # breaking the function when the only option is for a friendly piece to be ahead
+            else:
+                break
+
+    # horizontal movement to the left:
+    for k in range(1, y + 1):
+        new_y = y - k
+        if 0 <= new_y < 8:
+            if chess_board[x][new_y] == 0:
+                black_legal_moves.append([x, new_y])
+            elif 0 < chess_board[x][new_y] < 7:
+                black_legal_moves.append([x, new_y])
+                break
+            else:
+                break
 
 
 def white_vertical_movement(x, y):
-    global white_legal_moves
-    global current_piece_pos
-    for j in range(x):
-        if chess_board[x - j - 1][y] == 0:
-            white_legal_moves.append([x - j - 1, y])
-        elif chess_board[x - j - 1][y] in w_piece_dict.values():
-            break
-        elif chess_board[x - j - 1][y] in b_piece_dict.values():
-            white_legal_moves.append([x - j - 1, y])
-            break
-    for k in range(7 - x):
-        if chess_board[x + k + 1][y] == 0:
-            white_legal_moves.append([x + k + 1, y])
-        elif chess_board[x + k + 1][y] in w_piece_dict.values():
-            break
-        elif chess_board[x + k + 1][y] in b_piece_dict.values():
-            white_legal_moves.append([x + k + 1, y])
-            break
+    for j in range(1, 8 - x):
+        new_x = x + j
+        if 0 <= new_y < 8:
+            if chess_board[new_x][y] == 0:
+                white_legal_moves.append([new_x, y])
+            elif 6 < chess_board[new_x][y] < 13:
+                white_legal_moves.append([new_x, y])
+                break
+            else:
+                break
+    for k in range(1, x + 1):
+        new_x = x - k
+        if 0 <= new_y < 8:
+            if chess_board[new_x][y] == 0:
+                white_legal_moves.append([new_x, y])
+            elif 6 < chess_board[new_x][y] < 13:
+                white_legal_moves.append([new_x, y])
+                break
+            else:
+                break
 # vertical movement function for white queen, rook
 
 
 def black_vertical_movement(x, y):
-    global black_legal_moves
-    global current_piece_pos
-    for j in range(x):
-        if chess_board[x - j - 1][y] == 0:
-            black_legal_moves.append([x - j - 1, y])
-        if chess_board[x - j - 1][y] in b_piece_dict.values():
-            break
-        if chess_board[x - j - 1][y] in w_piece_dict.values():
-            black_legal_moves.append([x - j - 1, y])
-            break
-    for k in range(7 - x):
-        if chess_board[x + k + 1][y] == 0:
-            black_legal_moves.append([x + k + 1, y])
-        if chess_board[x + k + 1][y] in b_piece_dict.values():
-            break
-        if chess_board[x + k + 1][y] in w_piece_dict.values():
-            black_legal_moves.append([x + k + 1, y])
-            break
+    for j in range(1, 8 - x):
+        new_x = x + j
+        if 0 <= new_y < 8:
+            if chess_board[new_x][y] == 0:
+                black_legal_moves.append([new_x, y])
+            elif 0 < chess_board[new_x][y] < 7:
+                black_legal_moves.append([new_x, y])
+                break
+            else:
+                break
+    for k in range(1, x + 1):
+        new_x = x - k
+        if 0 <= new_y < 8:
+            if chess_board[new_x][y] == 0:
+                black_legal_moves.append([new_x, y])
+            elif 0 < chess_board[new_x][y] < 7:
+                black_legal_moves.append([new_x, y])
+                break
+            else:
+                break
 # vertical movement function for black queen, rook
 
 
 def white_diagonal_movement(x, y):
-    global white_legal_moves
-    for j in range(7):
-        if 7 >= x - j - 1 >= 0 and 7 >= y - j - 1 >= 0:
-            if chess_board[x - j - 1][y - j - 1] == 0:
-                white_legal_moves.append([x - j - 1, y - j - 1])
-            if chess_board[x - j - 1][y - j - 1] in w_piece_dict.values():
+    # diagonal movement to the top left(-x, -y)
+    for j in range(1, 8):
+        new_x, new_y = x - j, y - j
+        if 0 <= new_x < 8 and 0 <= new_y < 8:
+            if chess_board[new_x][new_y] == 0:
+                white_legal_moves.append([new_x, new_y])
+            elif 6 < chess_board[new_x][new_y] < 13:
+                white_legal_moves.append([new_x, new_y])
                 break
-            if chess_board[x - j - 1][y - j - 1] in b_piece_dict.values():
-                white_legal_moves.append([x - j - 1, y - j - 1])
+            else:
                 break
-    for k in range(7):
-        if 7 >= x + k + 1 >= 0 and 7 >= y - k - 1 >= 0:
-            if chess_board[x + k + 1][y - k - 1] == 0:
-                white_legal_moves.append([x + k + 1, y - k - 1])
-            if chess_board[x + k + 1][y - k - 1] in w_piece_dict.values():
+    # diagonal movement to the top right(-x, +y)
+    for k in range(1, 8):
+        new_x, new_y = x - k, y + k
+        if 0 <= new_x < 8 and 0 <= new_y < 8:
+            if chess_board[new_x][new_y] == 0:
+                white_legal_moves.append([new_x, new_y])
+            elif 6 < chess_board[new_x][new_y] < 13:
+                white_legal_moves.append([new_x, new_y])
                 break
-            if chess_board[x + k + 1][y - k - 1] in b_piece_dict.values():
-                white_legal_moves.append([x + k + 1, y - k - 1])
+            else:
                 break
-    for m in range(7):
-        if 7 >= x + m + 1 >= 0 and 7 >= y + m + 1 >= 0:
-            if chess_board[x + m + 1][y + m + 1] == 0:
-                white_legal_moves.append([x + m + 1, y + m + 1])
-            if chess_board[x + m + 1][y + m + 1] in w_piece_dict.values():
+    # diagonal movement to the bottom right( +x, +y)
+    for m in range(1, 8):
+        new_x, new_y = x + m, y + m
+        if 0 <= new_x < 8 and 0 <= new_y < 8:
+            if chess_board[new_x][new_y] == 0:
+                white_legal_moves.append([new_x, new_y])
+            elif 6 < chess_board[new_x][new_y] < 13:
+                white_legal_moves.append([new_x, new_y])
                 break
-            if chess_board[x + m + 1][y + m + 1] in b_piece_dict.values():
-                white_legal_moves.append([x + m + 1, y + m + 1])
+            else:
                 break
-    for n in range(7):
-        if 7 >= x - n - 1 >= 0 and 7 >= y + n + 1 >= 0:
-            if chess_board[x - n - 1][y + n + 1] == 0:
-                white_legal_moves.append([x - n - 1, y + n + 1])
-            if chess_board[x - n - 1][y + n + 1] in w_piece_dict.values():
+    # diagonal movement to the bottom left( +x, -y)
+    for n in range(1, 8):
+        new_x, new_y = x + n, y - n
+        if 0 <= new_x < 8 and 0 <= new_y < 8:
+            if chess_board[new_x][new_y] == 0:
+                white_legal_moves.append([new_x, new_y])
+            elif 6 < chess_board[new_x][new_y] < 13:
+                white_legal_moves.append([new_x, new_y])
                 break
-            if chess_board[x - n - 1][y + n + 1] in b_piece_dict.values():
-                white_legal_moves.append([x - n - 1, y + n + 1])
+            else:
                 break
-# diagonal movement function for white queen, bishop
 
 
 def black_diagonal_movement(x, y):
-    global black_legal_moves
-    for j in range(7):
-        if 7 >= x - j - 1 >= 0 and 7 >= y - j - 1 >= 0:
-            if chess_board[x - j - 1][y - j - 1] == 0:
-                black_legal_moves.append([x - j - 1, y - j - 1])
-            if chess_board[x - j - 1][y - j - 1] in b_piece_dict.values():
+    # diagonal movement to the top left(-x, -y)
+    for j in range(1, 8):
+        new_x, new_y = x - j, y - j
+        if 0 <= new_x < 8 and 0 <= new_y < 8:
+            print(f"Checking position: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
+            if chess_board[new_x][new_y] == 0:
+                black_legal_moves.append([new_x, new_y])
+                print(f"empty square: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
+            elif 0 < chess_board[new_x][new_y] < 7:
+                black_legal_moves.append([new_x, new_y])
+                print(f"Captured at: {new_x}, {new_y}")
                 break
-            if chess_board[x - j - 1][y - j - 1] in w_piece_dict.values():
-                black_legal_moves.append([x - j - 1, y - j - 1])
+            else:
+                print(f"Blocked at: {new_x}, {new_y}")
                 break
-    for k in range(7):
-        if 7 >= x + k + 1 >= 0 and 7 >= y - k - 1 >= 0:
-            if chess_board[x + k + 1][y - k - 1] == 0:
-                black_legal_moves.append([x + k + 1, y - k - 1])
-            if chess_board[x + k + 1][y - k - 1] in b_piece_dict.values():
+    # diagonal movement to the top right(-x, +y)
+    for k in range(1, 8):
+        new_x, new_y = x - k, y + k
+        if 0 <= new_x < 8 and 0 <= new_y < 8:
+            if chess_board[new_x][new_y] == 0:
+                black_legal_moves.append([new_x, new_y])
+            elif 0 < chess_board[new_x][new_y] < 7:
+                black_legal_moves.append([new_x, new_y])
                 break
-            if chess_board[x + k + 1][y - k - 1] in w_piece_dict.values():
-                black_legal_moves.append([x + k + 1, y - k - 1])
+            else:
                 break
-    for m in range(7):
-        if 7 >= x + m + 1 >= 0 and 7 >= y + m + 1 >= 0:
-            if chess_board[x + m + 1][y + m + 1] == 0:
-                black_legal_moves.append([x + m + 1, y + m + 1])
-            if chess_board[x + m + 1][y + m + 1] in b_piece_dict.values():
+    # diagonal movement to the bottom right( +x, +y)
+    for m in range(1, 8):
+        new_x, new_y = x + m, y + m
+        if 0 <= new_x < 8 and 0 <= new_y < 8:
+            if chess_board[new_x][new_y] == 0:
+                black_legal_moves.append([new_x, new_y])
+            elif 0 < chess_board[new_x][new_y] < 7:
+                black_legal_moves.append([new_x, new_y])
                 break
-            if chess_board[x + m + 1][y + m + 1] in w_piece_dict.values():
-                black_legal_moves.append([x + m + 1, y + m + 1])
+            else:
                 break
-    for n in range(7):
-        if 7 >= x - n - 1 >= 0 and 7 >= y + n + 1 >= 0:
-            if chess_board[x - n - 1][y + n + 1] == 0:
-                black_legal_moves.append([x - n - 1, y + n + 1])
-            if chess_board[x - n - 1][y + n + 1] in b_piece_dict.values():
+    # diagonal movement to the bottom left( +x, -y)
+    for n in range(1, 8):
+        new_x, new_y = x + n, y - n
+        if 0 <= new_x < 8 and 0 <= new_y < 8:
+            if chess_board[new_x][new_y] == 0:
+                black_legal_moves.append([new_x, new_y])
+            elif 0 < chess_board[new_x][new_y] < 7:
+                black_legal_moves.append([new_x, new_y])
                 break
-            if chess_board[x - n - 1][y + n + 1] in w_piece_dict.values():
-                black_legal_moves.append([x - n - 1, y + n + 1])
+            else:
                 break
-# diagonal movement function for black queen, bishop
 
 
 def white_king_movement(x, y):
-    global white_legal_moves
     king_moves = ((1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1))
     for (j, k) in king_moves:
         if 7 >= x + j >= 0 and 7 >= y + k >= 0:
-            if chess_board[x + j][y + k] not in w_piece_dict.values():
+            if not 0 < chess_board[x + j][y + k] < 7:
                 white_legal_moves.append([x + j, y + k])
 # movement function for white king
 
 
 def black_king_movement(x, y):
-    global black_legal_moves
     king_moves = ((1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1))
     for (j, k) in king_moves:
         if 7 >= x + j >= 0 and 7 >= y + k >= 0:
-            if chess_board[x + j][y + k] not in b_piece_dict.values():
+            if not 6 < chess_board[x + j][y + k] < 13:
                 black_legal_moves.append([x + j, y + k])
 # movement function for black king
 
@@ -450,9 +485,8 @@ def black_king_movement(x, y):
 if __name__ == '__main__':
     for i in range(8):
         print(chess_board[i])
-    iterate_white_pieces(chess_board)
-    iterate_black_pieces(chess_board)
-    changing_turns(x, y, new_x, new_y)
+    for j in range(1):
+        changing_turns(x, y, new_x, new_y)
     # get_legal_moves(piece, x, y)
     # black_horizontal_movement(x, y)
     # white_horizontal_movement(x, y)
