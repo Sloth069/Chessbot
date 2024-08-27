@@ -30,13 +30,13 @@ black_legal_moves = []
 
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
-chess_board = [[0, 1, 0, 0, 0, 0, 0, 0],
+chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
                [0, 0, 1, 1, 7, 0, 0, 0],
                [0, 0, 1, 10, 7, 0, 0, 0],
                [0, 0, 7, 1, 7, 0, 0, 0],
-               [7, 0, 0, 0, 0, 0, 0, 0],
+               [7, 10, 0, 0, 0, 0, 0, 0],
                [0, 7, 0, 0, 0, 0, 0, 0],
-               [0, 0, 1, 0, 1, 1, 1, 1],
+               [0, 0, 1, 1, 1, 1, 1, 1],
                [0, 3, 4, 0, 6, 4, 3, 2]]
 '''chess_board = [[0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 8, 0, 0],
@@ -51,6 +51,8 @@ x = 0
 y = 0
 new_x = 0
 new_y = 0
+w_king_pos = None
+b_king_pos = None
 
 # ----------------------------------------- 2. Define game rules and turns --------------------------------
 is_white_turn = True
@@ -69,7 +71,6 @@ def iterate_white_pieces(chess_board):
                 print(white_legal_moves)
                 if white_legal_moves:
                     current_piece_pos = (x, y)
-                    return
 # function to iterate the white pieces from the chess board
     # iterate over chess board
         # get piece_value, which is the value of the iterated piece
@@ -90,7 +91,6 @@ def iterate_black_pieces(chess_board):
                 print(black_legal_moves)
                 if black_legal_moves:
                     current_piece_pos = (x, y)
-                    return
 
 
 def execute_white_move(piece, x, y, new_x, new_y):
@@ -134,13 +134,25 @@ def execute_black_move(piece, x, y, new_x, new_y):
 def changing_turns(x, y, new_x, new_y):
     global is_white_turn
     piece = chess_board[x][y]
+
     while is_white_turn:
         print("white moves")
         execute_white_move(piece, x, y, new_x, new_y)
+        if is_king_in_check(chess_board, True):
+            if is_check_mate(chess_board, True):
+                print("Checkmate for Black")
+                return
+            print("White is in check")
+
         is_white_turn = False
     else:
         print("black moves")
         execute_black_move(piece, x, y, new_x, new_y)
+        if is_king_in_check(chess_board, True):
+            if is_check_mate(chess_board, True):
+                print("Checkmate for White")
+                return
+            print("Black is in check")
         is_white_turn = True
 
 
@@ -156,12 +168,59 @@ def print_updated_chess_board(chess_board):
 
 
 def update_chess_board(chess_board, x, y, new_x, new_y):
-    chess_board[new_x][new_y] = chess_board[x][y]
+    global w_king_pos, b_king_pos
+    piece = chess_board[x][y]
+
+    # updating the chessboard
+    chess_board[new_x][new_y] = piece
     chess_board[x][y] = 0
+
+    # updating the king positions in case they were moved
+    if piece == 6:     # (white king)
+        w_king_pos = (new_x, new_y)
+    elif piece == 12:   # (black king)
+        b_king_pos = (new_x, new_y)
+
     print_updated_chess_board(chess_board)
 
 
 # ------------------------------------- 3. Define function to check chess board and piece -----------------------
+
+def generate_opponents_moves(chess_board, is_white_turn):
+    legal_moves = []    # list for moves
+
+    for x in range(8):
+        for y in range(8):
+            piece = chess_board[x][y]
+            if (is_white_turn and 0 < piece < 7) or (not is_white_turn and 6 < piece < 13):
+                get_white_legal_moves(w_piece_dict.get(piece), x, y) if is_white_turn else \
+                get_black_legal_moves(b_piece_dict.get(piece), x, y)
+                legal_moves.extend(white_legal_moves if is_white_turn else black_legal_moves)
+    return legal_moves
+
+
+def is_king_in_check(chess_board, is_white_turn):
+    king_pos = w_king_pos if is_white_turn else b_king_pos
+    opponents_moves = generate_opponents_moves(chess_board, not is_white_turn)
+
+    return king_pos in opponents_moves
+
+
+def is_check_mate(chess_board, is_white_turn):
+    if not is_king_in_check(chess_board, is_white_turn):
+        return False
+
+    for x in range(8):
+        for y in range(8):
+            piece = chess_board
+            if (is_white_turn and 0 < piece < 7) or (not is_white_turn and 6 < piece < 13):
+                legal_moves = white_legal_moves if is_white_turn else black_legal_moves
+                for move in legal_moves:
+                    temp_board = [row[:] for row in chess_board]
+                    update_chess_board(temp_board, x, y, move[0], move[1])
+                    if not is_king_in_check(temp_board, is_white_turn):
+                        return False
+    return True
 
 
 def get_white_legal_moves(piece, x, y):
@@ -418,16 +477,16 @@ def black_diagonal_movement(x, y):
     for j in range(1, 8):
         new_x, new_y = x - j, y - j     # moving x up and y left
         if 0 <= new_x < 8 and 0 <= new_y < 8:       # checking that x and y are within the chessboard
-            print(f"Checking position: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
+            # print(f"Checking position: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
             if chess_board[new_x][new_y] == 0:      # checking for an empty square
                 black_legal_moves.append([new_x, new_y])
-                print(f"Empty square: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
+                # print(f"Empty square: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
             elif 0 < chess_board[new_x][new_y] < 7:        # checking for a white piece to take
                 black_legal_moves.append([new_x, new_y])
-                print(f"Captured at: {new_x}, {new_y}")
+                # print(f"Captured at: {new_x}, {new_y}")
                 break        # breaking after taking the piece
             else:       # last possibility is a friendly piece, so the function breaks
-                print(f"Friendly piece at: {new_x}, {new_y}")
+                # print(f"Friendly piece at: {new_x}, {new_y}")
                 break
     # diagonal movement to the top right(-x, +y)
     for k in range(1, 8):
