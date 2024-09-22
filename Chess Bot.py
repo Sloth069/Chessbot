@@ -18,27 +18,33 @@
 7. Improvements: checks and pressuring moves for tempo, stalemate forcing in losing positions, take out pieces from dict
    that are not on the field anymore
 """
+empty_square = 0
+w_piece_dict = {1: 'w_pawn', 2: 'w_rook', 3: 'w_knight', 4: 'w_bishop', 5: 'w_queen', 6: 'w_king'}
+b_piece_dict = {7: 'b_pawn', 8: 'b_rook', 9: 'b_knight', 10: 'b_bishop', 11: 'b_queen', 12: 'b_king'}
+w_king_pos = [7, 4]
+b_king_pos = [0, 4]
+is_white_turn = True
+
+# TODO: - write print statement to give out the piece, start- and end position of the move played
+#       - use pygame to implement visual representation of the chessboard
+#       - add promotion rule to pawns
+#       - run tests to check for edge cases and make sure the logic is correct
+#       - start working on move evaluation algorythm:
+#           1. minimax system
+#           2. weights for pieces
+#           3. "heatmap" masks for each individual piece
+#           4. tempo/ zugzwang weighing
+#           5. moving a piece should make consecutive moves with the same piece weigh less
+#           6. friendly pieces defending each other/ attacking same enemy position weigh more
+#           7. pins on heavy pieces good
+#       - ideas to make calculation more efficient:
+#           1. alpha beta pruning
+#           2. prioritize checks/heavy pieces/positions on the board
 import random
 
 # ------------------------------------------ Variables ------------------------------------------------------------
 
-empty_square = 0
-w_piece_dict = {1: 'w_pawn', 2: 'w_rook', 3: 'w_knight', 4: 'w_bishop', 5: 'w_queen', 6: 'w_king'}
-b_piece_dict = {7: 'b_pawn', 8: 'b_rook', 9: 'b_knight', 10: 'b_bishop', 11: 'b_queen', 12: 'b_king'}
-# white_possible_moves = []
-# black_possible_moves = []
-# white_legal_moves = []
-# black_legal_moves = []
-# x = 0
-# y = 0
-# new_x = 0
-# new_y = 0
-w_king_pos = [7, 4]
-b_king_pos = [0, 4]
-is_white_turn = True
-# current_piece_pos = [x, y]
-
-# TODO: is_white_turn übergeben an Funktionen/ global löschen
+#
 
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
@@ -46,9 +52,9 @@ chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [7, 7, 7, 7, 7, 7, 7, 7],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 10, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [1, 1, 1, 0, 1, 1, 1, 1],
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [1, 1, 1, 1, 1, 1, 1, 1],
                [2, 3, 4, 5, 6, 4, 3, 2]]
 '''chess_board = [[0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 8, 0, 0],
@@ -67,10 +73,8 @@ def changing_turns():
     global is_white_turn
 
     while is_white_turn:
-        print("white moves")
         is_white_turn = False
     else:
-        print("black moves")
         is_white_turn = True
 
 
@@ -83,16 +87,24 @@ def generate_opponents_moves(chess_board, is_white_turn):
     return legal_moves
 
 
-def is_king_in_check(chess_board, is_white_turn):
-    king_pos = w_king_pos if is_white_turn else b_king_pos
-    for i in range(8):
-        print(chess_board[i])
+def is_king_in_check(temp_board, is_white_turn):
+    king_pos = None
 
-    for move in generate_opponents_moves(chess_board, is_white_turn):
+    for x in range(len(temp_board)):
+        for y in range(len(temp_board[x])):
+            if is_white_turn:
+                if temp_board[x][y] == 6:
+                    king_pos = [x, y]
+            else:
+                if temp_board[x][y] == 12:
+                    king_pos = [x, y]
+
+    for move in generate_opponents_moves(temp_board, is_white_turn):
         if [move[2], move[3]] == king_pos:
             print("king is in check")
-            is_check_mate(chess_board, is_white_turn)
+
             return True
+
     return False
 
 
@@ -160,29 +172,29 @@ def update_chess_board(chess_board, move):
 
 
 def get_white_possible_moves(chess_board):
-    white_possible_movess = []
+    white_possible_moves = []
 
     for x in range(8):
         for y in range(8):
             piece = chess_board[x][y]
 
             if piece == 1:
-                white_possible_movess.append(white_pawn_movement(chess_board, x, y))
+                white_possible_moves.append(white_pawn_movement(chess_board, x, y))
             elif piece == 2:
-                white_possible_movess.append(white_knight_movement(chess_board, x, y))
+                white_possible_moves.append(white_horizontal_movement(chess_board, x, y))
+                white_possible_moves.append(white_vertical_movement(chess_board, x, y))
             elif piece == 3:
-                white_possible_movess.append(white_horizontal_movement(chess_board, x, y))
-                white_possible_movess.append(white_vertical_movement(chess_board, x, y))
+                white_possible_moves.append(white_knight_movement(chess_board, x, y))
             elif piece == 4:
-                white_possible_movess.append(white_diagonal_movement(chess_board, x, y))
+                white_possible_moves.append(white_diagonal_movement(chess_board, x, y))
             elif piece == 5:
-                white_possible_movess.append(white_horizontal_movement(chess_board, x, y))
-                white_possible_movess.append(white_vertical_movement(chess_board, x, y))
-                white_possible_movess.append(white_diagonal_movement(chess_board, x, y))
+                white_possible_moves.append(white_horizontal_movement(chess_board, x, y))
+                white_possible_moves.append(white_vertical_movement(chess_board, x, y))
+                white_possible_moves.append(white_diagonal_movement(chess_board, x, y))
             elif piece == 6:
-                white_possible_movess.append(white_king_movement(chess_board, x, y))
+                white_possible_moves.append(white_king_movement(chess_board, x, y))
 
-    return white_possible_movess
+    return white_possible_moves
 
 
 def get_white_legal_moves(chess_board):
@@ -194,33 +206,33 @@ def get_white_legal_moves(chess_board):
         current_x, current_y, new_x, new_y = move
         if is_move_legal(chess_board, move):
             white_legal_moves.append(move)
-
+    # print(white_legal_moves)
     return white_legal_moves
 
 
 def get_black_possible_moves(chess_board):
-    black_possible_movess = []
+    black_possible_moves = []
     for x in range(8):
         for y in range(8):
             piece = chess_board[x][y]
 
             if piece == 7:
-                black_possible_movess.append(black_pawn_movement(chess_board, x, y))
+                black_possible_moves.append(black_pawn_movement(chess_board, x, y))
             elif piece == 8:
-                black_possible_movess.append(black_knight_movement(chess_board, x, y))
+                black_possible_moves.append(black_horizontal_movement(chess_board, x, y))
+                black_possible_moves.append(black_vertical_movement(chess_board, x, y))
             elif piece == 9:
-                black_possible_movess.append(black_horizontal_movement(chess_board, x, y))
-                black_possible_movess.append(black_vertical_movement(chess_board, x, y))
+                black_possible_moves.append(black_knight_movement(chess_board, x, y))
             elif piece == 10:
-                black_possible_movess.append(black_diagonal_movement(chess_board, x, y))
+                black_possible_moves.append(black_diagonal_movement(chess_board, x, y))
             elif piece == 11:
-                black_possible_movess.append(black_horizontal_movement(chess_board, x, y))
-                black_possible_movess.append(black_vertical_movement(chess_board, x, y))
-                black_possible_movess.append(black_diagonal_movement(chess_board, x, y))
+                black_possible_moves.append(black_horizontal_movement(chess_board, x, y))
+                black_possible_moves.append(black_vertical_movement(chess_board, x, y))
+                black_possible_moves.append(black_diagonal_movement(chess_board, x, y))
             elif piece == 12:
-                black_possible_movess.append(black_king_movement(chess_board, x, y))
+                black_possible_moves.append(black_king_movement(chess_board, x, y))
 
-    return black_possible_movess
+    return black_possible_moves
 
 
 def get_black_legal_moves(chess_board):
@@ -246,8 +258,6 @@ def white_pawn_movement(chess_board, x, y):
         # moving forward if space ahead is empty
         if chess_board[x - 1][y] == 0:
             white_pawn_moves.append([x, y, x - 1, y])
-            # current_x, current_y, new_x, new_y = white_possible_moves[0]
-            # print(white_possible_moves, current_x, current_y, new_x, new_y)
         # moving forward 2 spaces if in original position and both are empty
         if x == 6 and chess_board[x - 1][y] == 0 and chess_board[x - 2][y] == 0:
             white_pawn_moves.append([x, y, x - 2, y])
@@ -566,17 +576,30 @@ if __name__ == '__main__':
     for i in range(8):
         print(chess_board[i])
     for j in range(1):
+        print("Its Whites turn!")
         legal_moves = get_white_legal_moves(chess_board)
         white_choice = random.choice(legal_moves)
-        print("+++", white_choice)
+
         if white_choice:
-            print("White moves from", white_choice[0], white_choice[1], "to", white_choice[2], white_choice[3])
+            piece_int = chess_board[white_choice[0]][white_choice[1]]
+            piece_str = w_piece_dict.get(piece_int)
+            print(f" White moves {piece_str} from "
+                  f"{white_choice[0], white_choice[1]} to --> {white_choice[2], white_choice[3]}")
             update_chess_board(chess_board, white_choice)
             changing_turns()
         else:
             print("no legal moves for White")
 
-        """legal_moves = get_black_legal_moves(chess_board)
+        print(" It´s Blacks turn!")
+        legal_moves = get_black_legal_moves(chess_board)
         black_choice = random.choice(legal_moves)
-        update_chess_board(chess_board, black_choice)
-        changing_turns()"""
+
+        if black_choice:
+            piece_int = chess_board[black_choice[0]][black_choice[1]]
+            piece_str = b_piece_dict.get(piece_int)
+            print(f" Black moves {piece_str} from "
+                  f"{black_choice[0], black_choice[1]} to --> {black_choice[2], black_choice[3]}")
+            update_chess_board(chess_board, black_choice)
+            changing_turns()
+        else:
+            print("no legal moves for Black")
