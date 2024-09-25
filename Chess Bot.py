@@ -25,7 +25,7 @@ w_king_pos = [7, 4]
 b_king_pos = [0, 4]
 is_white_turn = True
 
-# TODO: - write print statement to give out the piece, start- and end position of the move played
+# TODO:
 #       - use pygame to implement visual representation of the chessboard
 #       - add promotion rule to pawns
 #       - run tests to check for edge cases and make sure the logic is correct
@@ -56,14 +56,14 @@ chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [1, 1, 1, 1, 1, 1, 1, 1],
                [2, 3, 4, 5, 6, 4, 3, 2]]
-'''chess_board = [[0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 8, 0, 0],
-               [0, 0, 0, 0, 1, 0, 0, 0],
-               [0, 0, 0, 0, 1, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 8, 0],
-               [8, 0, 0, 0, 8, 0, 0, 0],
-               [0, 1, 0, 1, 0, 1, 0, 1],
-               [0, 0, 0, 0, 0, 0, 0, 0]]'''
+"""chess_board = [[0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 0, 1, 0, 0],
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 7, 0, 0, 0],
+               [0, 0, 0, 0, 0, 0, 0, 0]]"""
 
 
 # ----------------------------------------- 2. Define game rules and turns --------------------------------
@@ -72,7 +72,7 @@ chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
 def changing_turns():
     global is_white_turn
 
-    while is_white_turn:
+    if is_white_turn:
         is_white_turn = False
     else:
         is_white_turn = True
@@ -101,7 +101,6 @@ def is_king_in_check(temp_board, is_white_turn):
 
     for move in generate_opponents_moves(temp_board, is_white_turn):
         if [move[2], move[3]] == king_pos:
-            print("king is in check")
 
             return True
 
@@ -110,13 +109,17 @@ def is_king_in_check(temp_board, is_white_turn):
 
 def is_check_mate(chess_board, is_white_turn):
     if is_white_turn:
-        if not get_white_possible_moves(chess_board):
-            print("Checkmate for Black!")
-            return True
+        if is_king_in_check(chess_board, is_white_turn):
+            if not get_white_legal_moves(chess_board):
+                print(" Checkmate for Black!")
+
+                return True
     else:
-        if not get_black_possible_moves(chess_board):
-            print("Checkmate for White!")
-            return True
+        if is_king_in_check(chess_board, is_white_turn):
+            if not get_black_legal_moves(chess_board):
+                print(" Checkmate for White!")
+
+                return True
 
     return False
 
@@ -129,18 +132,60 @@ def simulate_move(chess_board, move):
     piece = temp_board[move[0]][move[1]]
     temp_board[move[2]][move[3]] = piece
     temp_board[move[0]][move[1]] = 0
+    # for i in range(8):
+        # print("+++", temp_board[i])
 
     return temp_board
 
 
-def is_move_legal(chess_board, move):
+def is_move_legal(chess_board, move, is_white_turn):
 
     temp_board = simulate_move(chess_board, move)
     # Check if king is in check after the move
     if is_king_in_check(temp_board, is_white_turn):
+
         return False
 
     return True
+
+
+def pawn_promotion(is_white_turn):
+
+    if is_white_turn:
+        promoted_piece = 5
+    else:
+        promoted_piece = 11
+
+    return promoted_piece
+
+
+def update_chess_board(chess_board, move, is_white_turn):
+    global w_king_pos, b_king_pos
+
+    piece = chess_board[move[0]][move[1]]
+    end_x, end_y = move[2], move[3]
+
+    chess_board[end_x][end_y] = piece
+    chess_board[move[0]][move[1]] = 0
+
+    # promoting pawns on the last rank to queens
+    if is_white_turn and piece == 1 and end_x == 0:
+        promoted_piece = pawn_promotion(is_white_turn)
+        chess_board[end_x][end_y] = promoted_piece
+        print(" White pawn promotes to a queen")
+
+    elif not is_white_turn and piece == 7 and end_x == 7:
+        promoted_piece = pawn_promotion(is_white_turn)
+        chess_board[end_x][end_y] = promoted_piece
+        print(" Black pawn promotes to a queen")
+
+    # updating the king positions in case they were moved
+    if chess_board[end_x][end_y] == 6:     # (white king)
+        w_king_pos = [end_x, end_y]
+    elif chess_board[end_x][end_y] == 12:   # (black king)
+        b_king_pos = [end_x, end_y]
+
+    print_updated_chess_board(chess_board)
 
 
 def print_updated_chess_board(chess_board):
@@ -150,23 +195,6 @@ def print_updated_chess_board(chess_board):
     for row in chess_board:
         print(" ".join(piece_symbols.get(piece, str(piece)) for piece in row))
     print("\n")
-
-
-def update_chess_board(chess_board, move):
-    global w_king_pos, b_king_pos
-
-    # updating the chessboard
-    chess_board[move[2]][move[3]] = chess_board[move[0]][move[1]]
-    chess_board[move[0]][move[1]] = 0
-
-    # updating the king positions in case they were moved
-    if chess_board[move[2]][move[3]] == 6:     # (white king)
-        w_king_pos = [move[2], move[3]]
-    elif chess_board[move[2]][move[3]] == 12:   # (black king)
-        b_king_pos = [move[2], move[3]]
-
-    print_updated_chess_board(chess_board)
-
 
 # ------------------------------------- 3. Define function to check chess board and piece -----------------------
 
@@ -204,14 +232,16 @@ def get_white_legal_moves(chess_board):
 
     for move in flattened_white_possible_moves:
         current_x, current_y, new_x, new_y = move
-        if is_move_legal(chess_board, move):
+        if is_move_legal(chess_board, move, is_white_turn):
             white_legal_moves.append(move)
     # print(white_legal_moves)
+
     return white_legal_moves
 
 
 def get_black_possible_moves(chess_board):
     black_possible_moves = []
+
     for x in range(8):
         for y in range(8):
             piece = chess_board[x][y]
@@ -242,7 +272,7 @@ def get_black_legal_moves(chess_board):
 
     for move in flattened_black_possible_moves:
         current_x, current_y, new_x, new_y = move
-        if is_move_legal(chess_board, move):
+        if is_move_legal(chess_board, move, is_white_turn):
             black_legal_moves.append(move)
 
     return black_legal_moves
@@ -254,7 +284,7 @@ def get_black_legal_moves(chess_board):
 def white_pawn_movement(chess_board, x, y):
     white_pawn_moves = []
 
-    if x > 0:
+    if 0 < x < 7:
         # moving forward if space ahead is empty
         if chess_board[x - 1][y] == 0:
             white_pawn_moves.append([x, y, x - 1, y])
@@ -262,10 +292,10 @@ def white_pawn_movement(chess_board, x, y):
         if x == 6 and chess_board[x - 1][y] == 0 and chess_board[x - 2][y] == 0:
             white_pawn_moves.append([x, y, x - 2, y])
         # capturing the piece diagonally right
-        if y < 7 and 6 < chess_board[x - 1][y + 1] < 13:
+        if 0 <= y < 7 and 6 < chess_board[x - 1][y + 1] < 13:
             white_pawn_moves.append([x, y, x - 1, y + 1])
         # Capturing the piece diagonally left
-        if y > 0 and 6 < chess_board[x - 1][y - 1] < 13:
+        if 0 < y <= 7 and 6 < chess_board[x - 1][y - 1] < 13:
             white_pawn_moves.append([x, y, x - 1, y - 1])
 
     return white_pawn_moves
@@ -274,18 +304,18 @@ def white_pawn_movement(chess_board, x, y):
 def black_pawn_movement(chess_board, x, y):
     black_pawn_moves = []
 
-    if x > 0:
+    if 0 < x < 7:
         # moving forward if space ahead is empty
         if chess_board[x + 1][y] == 0:
             black_pawn_moves.append([x, y, x + 1, y])
         # moving forward 2 spaces if in original position and both are empty
-        if x == 6 and chess_board[x + 1][y] == 0 and chess_board[x + 2][y] == 0:
+        elif x == 1 and chess_board[x + 1][y] == 0 and chess_board[x + 2][y] == 0:
             black_pawn_moves.append([x, y, x + 2, y])
         # capturing the piece diagonally right
-        if y < 7 and 0 < chess_board[x + 1][y + 1] < 7:
+        elif 0 <= y < 7 and 0 < chess_board[x + 1][y + 1] < 7:
             black_pawn_moves.append([x, y, x + 1, y + 1])
         # Capturing the piece diagonally left
-        if y > 0 and 0 < chess_board[x + 1][y - 1] < 7:
+        elif 0 < y <= 7 and 0 < chess_board[x + 1][y - 1] < 7:
             black_pawn_moves.append([x, y, x + 1, y - 1])
 
     return black_pawn_moves
@@ -575,31 +605,41 @@ def black_king_movement(chess_board, x, y):
 if __name__ == '__main__':
     for i in range(8):
         print(chess_board[i])
-    for j in range(1):
-        print("Its Whites turn!")
+    while True:
+        print(" Its Whites turn!")
+        if is_king_in_check(chess_board, is_white_turn):
+            print(" White king is in check")
         legal_moves = get_white_legal_moves(chess_board)
-        white_choice = random.choice(legal_moves)
 
-        if white_choice:
+        if legal_moves:
+            white_choice = random.choice(legal_moves)
             piece_int = chess_board[white_choice[0]][white_choice[1]]
             piece_str = w_piece_dict.get(piece_int)
             print(f" White moves {piece_str} from "
                   f"{white_choice[0], white_choice[1]} to --> {white_choice[2], white_choice[3]}")
-            update_chess_board(chess_board, white_choice)
+            update_chess_board(chess_board, white_choice, is_white_turn)
             changing_turns()
         else:
-            print("no legal moves for White")
+            if is_check_mate(chess_board, is_white_turn):
+
+                # print(" no legal moves for White")
+                break
 
         print(" It´s Blacks turn!")
+        if is_king_in_check(chess_board, is_white_turn):
+            print(" Black king is in check")
         legal_moves = get_black_legal_moves(chess_board)
-        black_choice = random.choice(legal_moves)
 
-        if black_choice:
+        if legal_moves:
+            black_choice = random.choice(legal_moves)
             piece_int = chess_board[black_choice[0]][black_choice[1]]
             piece_str = b_piece_dict.get(piece_int)
             print(f" Black moves {piece_str} from "
                   f"{black_choice[0], black_choice[1]} to --> {black_choice[2], black_choice[3]}")
-            update_chess_board(chess_board, black_choice)
+            update_chess_board(chess_board, black_choice, is_white_turn)
             changing_turns()
         else:
-            print("no legal moves for Black")
+            if is_check_mate(chess_board, is_white_turn):
+                # print(" no legal moves for Black")
+                break
+
