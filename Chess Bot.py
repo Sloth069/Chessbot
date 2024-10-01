@@ -23,51 +23,103 @@ w_piece_dict = {1: 'w_pawn', 2: 'w_rook', 3: 'w_knight', 4: 'w_bishop', 5: 'w_qu
 b_piece_dict = {7: 'b_pawn', 8: 'b_rook', 9: 'b_knight', 10: 'b_bishop', 11: 'b_queen', 12: 'b_king'}
 w_king_pos = [7, 4]
 b_king_pos = [0, 4]
+w_king_not_moved = True
+b_king_not_moved = True
+w_h_rook_not_moved = True
+w_a_rook_not_moved = True
+b_h_rook_not_moved = True
+b_a_rook_not_moved = True
 is_white_turn = True
 
 # TODO:
 #       - use pygame to implement visual representation of the chessboard
-#       - add promotion rule to pawns
-#       - run tests to check for edge cases and make sure the logic is correct
+#       - add a timer to see how long the program needs to make a move
+#       - add promotion rule to pawns *
+#       - run tests to check for edge cases and make sure the logic is correct *
 #       - start working on move evaluation algorythm:
-#           1. minimax system
-#           2. weights for pieces
+#           1. minimax system *
+#           2. weights for pieces *
 #           3. "heatmap" masks for each individual piece
 #           4. tempo/ zugzwang weighing
 #           5. moving a piece should make consecutive moves with the same piece weigh less
 #           6. friendly pieces defending each other/ attacking same enemy position weigh more
 #           7. pins on heavy pieces good
+#           8. trade pieces when ahead to simplify position
+#           9.
 #       - ideas to make calculation more efficient:
-#           1. alpha beta pruning
+#           1. alpha beta pruning *
 #           2. prioritize checks/heavy pieces/positions on the board
-
-
-# ------------------------------------------ Variables ------------------------------------------------------------
-
-#
 
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
-chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
+"""chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [7, 7, 7, 7, 7, 7, 7, 7],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [1, 1, 1, 1, 1, 1, 1, 1],
-               [2, 3, 4, 5, 6, 4, 3, 2]]
-"""chess_board = [[0, 0, 0, 11, 0, 0, 0, 0],
+               [2, 3, 4, 5, 6, 4, 3, 2]]"""
+chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [9, 0, 0, 2, 0, 0, 7, 0],
-               [0, 0, 0, 8, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0]]"""
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 6, 0, 0, 2]]
+
+# ------------------------------------------ Pygame Chessboard -------------------------------------------------------
+
+import pygame
+
+pygame.init()
+
+width = 800
+height = 800
+dimensions = 8
+square = height // dimensions
+screen = pygame.display.set_mode((width, height))
+screen.fill(pygame.Color("white"))
+images = {}
+
+pieces = ['w_pawn', 'w_knight', 'w_rook', 'w_bishop', 'w_queen', 'w_king',
+          'b_pawn', 'b_knight', 'b_rook', 'b_bishop', 'b_queen', 'b_king']
+for piece in pieces:
+    images[piece] = pygame.image.load("chess pieces/" + piece + ".png")
+
+
+def visualize_game_state(screen):
+    draw_board(screen)
+    draw_pieces(screen, images, chess_board)
+
+
+def draw_board(screen):
+    colors = [pygame.Color("white"), pygame.Color("gray")]
+
+    for row in range(dimensions):
+        for column in range(dimensions):
+            color = colors[((row + column) % 2)]
+            pygame.draw.rect(screen, color, pygame.Rect(column * square, row * square, square, square))
+
+
+def draw_pieces(screen, images, chess_board):
+    for row in range(dimensions):
+        for column in range(dimensions):
+            piece = chess_board[column][row]
+            if 0 < piece < 7:
+                piece_int = chess_board[column][row]
+                piece_str = w_piece_dict.get(piece_int)
+                scaled_image = pygame.transform.scale(images[piece_str], (square - 5, square - 5))
+                screen.blit(scaled_image, pygame.Rect(row * square, column * square, square, square))
+            if 6 < piece < 13:
+                piece_int = chess_board[column][row]
+                piece_str = b_piece_dict.get(piece_int)
+                scaled_image = pygame.transform.scale(images[piece_str], (square - 5, square - 5))
+                screen.blit(scaled_image, pygame.Rect(row * square, column * square, square, square))
 
 
 # ----------------------------------------- 2. Define game rules and turns --------------------------------
-
 
 def changing_turns():
     global is_white_turn
@@ -98,7 +150,6 @@ def is_king_in_check(temp_board, is_white_turn):
 
     for move in generate_opponents_moves(temp_board, is_white_turn):
         if [move[2], move[3]] == king_pos:
-
             return True
 
     return False
@@ -130,23 +181,20 @@ def simulate_move(chess_board, move):
     temp_board[move[2]][move[3]] = piece
     temp_board[move[0]][move[1]] = 0
     # for i in range(8):
-        # print("+++", temp_board[i])
+    # print("+++", temp_board[i])
     return temp_board
 
 
 def is_move_legal(chess_board, move, is_white_turn):
-
     temp_board = simulate_move(chess_board, move)
     # Check if king is in check after the move
     if is_king_in_check(temp_board, is_white_turn):
-
         return False
 
     return True
 
 
 def pawn_promotion(is_white_turn):
-
     if is_white_turn:
         promoted_piece = 5
     else:
@@ -157,7 +205,8 @@ def pawn_promotion(is_white_turn):
 
 def update_chess_board(chess_board, move, is_white_turn):
     global w_king_pos, b_king_pos
-
+    global w_king_not_moved, b_king_not_moved
+    global w_h_rook_not_moved, w_a_rook_not_moved, b_h_rook_not_moved, b_a_rook_not_moved
     piece = chess_board[move[0]][move[1]]
     end_x, end_y = move[2], move[3]
 
@@ -176,21 +225,60 @@ def update_chess_board(chess_board, move, is_white_turn):
         print(" Black pawn promotes to a queen")
 
     # updating the king positions in case they were moved
-    if chess_board[end_x][end_y] == 6:     # (white king)
+    if chess_board[end_x][end_y] == 6:  # (white king)
         w_king_pos = [end_x, end_y]
-    elif chess_board[end_x][end_y] == 12:   # (black king)
+
+        if w_king_pos != chess_board[7][4]:
+            w_king_not_moved = False
+
+        # moving the h-file rook for short castle white
+        if move[1] == 4 and chess_board[7][move[3]] == chess_board[7][6]:
+            chess_board[7][5] = chess_board[7][7]
+            chess_board[7][7] = 0
+        # moving the a-file rook for long castle white
+        if move[1] == 4 and chess_board[7][move[3]] == chess_board[7][2]:
+            chess_board[7][3] = chess_board[7][0]
+            chess_board[7][0] = 0
+
+    elif chess_board[end_x][end_y] == 12:  # (black king)
         b_king_pos = [end_x, end_y]
+
+        if b_king_pos != chess_board[0][4]:
+            b_king_not_moved = False
+
+        # moving the h-file rook for short castle black
+        if move[1] == 4 and chess_board[0][move[3]] == chess_board[0][6]:
+            chess_board[0][5] = chess_board[0][7]
+            chess_board[0][7] = 0
+        # moving the a-file rook for long castle black
+        if move[1] == 4 and chess_board[0][move[3]] == chess_board[0][2]:
+            chess_board[0][3] = chess_board[0][0]
+            chess_board[0][0] = 0
+
+    if chess_board[end_x][end_y] == 2:
+        if move[1] == 7:
+            w_h_rook_not_moved = False
+    if chess_board[end_x][end_y] == 2:
+        if move[1] == 0:
+            w_a_rook_not_moved = False
+    if chess_board[end_x][end_y] == 8:
+        if move[1] == 7:
+            b_h_rook_not_moved = False
+    if chess_board[end_x][end_y] == 2:
+        if move[1] == 0:
+            b_a_rook_not_moved = False
 
     print_updated_chess_board(chess_board)
 
 
 def print_updated_chess_board(chess_board):
     piece_symbols = {0: '0', 1: 'P', 2: 'R', 3: 'N', 4: 'B', 5: 'Q', 6: 'K',
-                        7: 'p', 8: 'r', 9: 'n', 10: 'b', 11: 'q', 12: 'k'}
+                     7: 'p', 8: 'r', 9: 'n', 10: 'b', 11: 'q', 12: 'k'}
     print("Current Chess Board:")
     for row in chess_board:
         print(" ".join(piece_symbols.get(piece, str(piece)) for piece in row))
     print("\n")
+
 
 # ------------------------------------- 3. Define function to check chess board and piece -----------------------
 
@@ -435,6 +523,8 @@ def white_vertical_movement(chess_board, x, y):
                 break
 
     return white_vertical_moves
+
+
 # vertical movement function for white queen, rook
 
 
@@ -463,6 +553,8 @@ def black_vertical_movement(chess_board, x, y):
                 break
 
     return black_vertical_moves
+
+
 # vertical movement function for black queen, rook
 
 
@@ -522,17 +614,17 @@ def black_diagonal_movement(chess_board, x, y):
 
     # diagonal movement to the top left(-x, -y)
     for j in range(1, 8):
-        new_x, new_y = x - j, y - j     # moving x up and y left
-        if 0 <= new_x < 8 and 0 <= new_y < 8:       # checking that x and y are within the chessboard
+        new_x, new_y = x - j, y - j  # moving x up and y left
+        if 0 <= new_x < 8 and 0 <= new_y < 8:  # checking that x and y are within the chessboard
             # print(f"Checking position: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
-            if chess_board[new_x][new_y] == 0:      # checking for an empty square
+            if chess_board[new_x][new_y] == 0:  # checking for an empty square
                 black_diagonal_moves.append([x, y, new_x, new_y])
                 # print(f"Empty square: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
-            elif 0 < chess_board[new_x][new_y] < 7:        # checking for a white piece to take
+            elif 0 < chess_board[new_x][new_y] < 7:  # checking for a white piece to take
                 black_diagonal_moves.append([x, y, new_x, new_y])
                 # print(f"Captured at: {new_x}, {new_y}")
-                break        # breaking after taking the piece
-            else:       # last possibility is a friendly piece, so the function breaks
+                break  # breaking after taking the piece
+            else:  # last possibility is a friendly piece, so the function breaks
                 # print(f"Friendly piece at: {new_x}, {new_y}")
                 break
     # diagonal movement to the top right(-x, +y)
@@ -580,7 +672,25 @@ def white_king_movement(chess_board, x, y):
         if 7 >= x + j >= 0 and 7 >= y + k >= 0:
             if not 0 < chess_board[x + j][y + k] < 7:
                 white_king_moves.append([x, y, x + j, y + k])
-# movement function for white king
+
+    if w_king_not_moved:
+        if w_h_rook_not_moved:
+            if chess_board[7][5] == 0 and chess_board[7][6] == 0:
+                if chess_board[7][4] not in generate_opponents_moves(chess_board, is_white_turn) and \
+                        chess_board[7][5] not in generate_opponents_moves(chess_board, is_white_turn) and \
+                        chess_board[7][6] not in generate_opponents_moves(chess_board, is_white_turn):
+                    white_king_moves.append([x, y, 7, 6])
+        if w_a_rook_not_moved:
+            if chess_board[7][2] == 0 and chess_board[7][3] == 0:
+                if chess_board[7][4] not in generate_opponents_moves(chess_board, is_white_turn) and \
+                        chess_board[7][2] not in generate_opponents_moves(chess_board, is_white_turn) and \
+                        chess_board[7][3] not in generate_opponents_moves(chess_board, is_white_turn):
+                    white_king_moves.append([x, y, 7, 2])
+    print("+", w_king_not_moved)
+    print("++", w_h_rook_not_moved)
+    print("+++", white_king_moves)
+
+    # movement function for white king
 
     return white_king_moves
 
@@ -594,14 +704,29 @@ def black_king_movement(chess_board, x, y):
             if not 6 < chess_board[x + j][y + k] < 13:
                 black_king_moves.append([x, y, x + j, y + k])
 
+    if b_king_not_moved:
+        if b_h_rook_not_moved:
+            if chess_board[0][5] == 0 and chess_board[0][6] == 0:
+                if chess_board[0][4] not in generate_opponents_moves(chess_board, is_white_turn) and \
+                        chess_board[0][5] not in generate_opponents_moves(chess_board, is_white_turn) and \
+                        chess_board[0][6] not in generate_opponents_moves(chess_board, is_white_turn):
+                    black_king_moves.append([x, y, 0, 6])
+        if w_a_rook_not_moved:
+            if chess_board[0][2] == 0 and chess_board[0][3] == 0:
+                if chess_board[0][4] not in generate_opponents_moves(chess_board, is_white_turn) and \
+                        chess_board[0][2] not in generate_opponents_moves(chess_board, is_white_turn) and \
+                        chess_board[0][3] not in generate_opponents_moves(chess_board, is_white_turn):
+                    black_king_moves.append([x, y, 0, 2])
+
     return black_king_moves
+
+
 # movement function for black king
 
 # ----------------------------------------- Move Evaluation Algorythm -------------------------------
 
 
 def minimax(chess_board, depth, is_white_turn, alpha, beta):
-
     if depth == 0 or is_check_mate(chess_board, is_white_turn):
         return evaluate_board_state(chess_board, is_white_turn)
 
@@ -684,53 +809,67 @@ def find_best_move(chess_board, is_white_turn, depth):
 
     return best_move
 
+
 # ----------------------------------------- Main Function -------------------------------------------
 
 
 depth = 4
 
 if __name__ == '__main__':
-    for i in range(8):
-        print(chess_board[i])
-    while True:
-        print(" Its Whites turn!")
-        if is_king_in_check(chess_board, is_white_turn):
-            print(" White king is in check")
-        best_move = find_best_move(chess_board, is_white_turn, depth)
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        visualize_game_state(screen)
+        pygame.display.flip()
+        # for i in range(8):
+        # print(chess_board[i])
+        while is_white_turn:
+            print(" Its Whites turn!")
+            if is_king_in_check(chess_board, is_white_turn):
+                print(" White king is in check")
+            best_move = find_best_move(chess_board, is_white_turn, depth)
+            if best_move:
+                white_choice = best_move
+                piece_int = chess_board[white_choice[0]][white_choice[1]]
+                piece_str = w_piece_dict.get(piece_int)
+                print(f" White moves {piece_str} from "
+                      f"{white_choice[0], white_choice[1]} to --> {white_choice[2], white_choice[3]}")
+                update_chess_board(chess_board, white_choice, is_white_turn)
+                visualize_game_state(screen)
+                pygame.display.flip()
+                print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
+                changing_turns()
 
-        if best_move:
-            white_choice = best_move
-            piece_int = chess_board[white_choice[0]][white_choice[1]]
-            piece_str = w_piece_dict.get(piece_int)
-            print(f" White moves {piece_str} from "
-                  f"{white_choice[0], white_choice[1]} to --> {white_choice[2], white_choice[3]}")
-            update_chess_board(chess_board, white_choice, is_white_turn)
-            print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
-            changing_turns()
-        else:
-            if is_check_mate(chess_board, is_white_turn):
-                break
             else:
-                print("Draw by Stalemate!")
-                break
+                if is_check_mate(chess_board, is_white_turn):
+                    break
+                else:
+                    print("Draw by Stalemate!")
+                    break
 
-        print(" It´s Blacks turn!")
-        if is_king_in_check(chess_board, is_white_turn):
-            print(" Black king is in check")
-        best_move = find_best_move(chess_board, is_white_turn, depth)
+            print(" It´s Blacks turn!")
+            if is_king_in_check(chess_board, is_white_turn):
+                print(" Black king is in check")
+            best_move = find_best_move(chess_board, is_white_turn, depth)
 
-        if best_move:
-            black_choice = best_move
-            piece_int = chess_board[black_choice[0]][black_choice[1]]
-            piece_str = b_piece_dict.get(piece_int)
-            print(f" Black moves {piece_str} from "
-                  f"{black_choice[0], black_choice[1]} to --> {black_choice[2], black_choice[3]}")
-            update_chess_board(chess_board, black_choice, is_white_turn)
-            print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
-            changing_turns()
-        else:
-            if is_check_mate(chess_board, is_white_turn):
-                break
+            if best_move:
+                black_choice = best_move
+                piece_int = chess_board[black_choice[0]][black_choice[1]]
+                piece_str = b_piece_dict.get(piece_int)
+                print(f" Black moves {piece_str} from "
+                      f"{black_choice[0], black_choice[1]} to --> {black_choice[2], black_choice[3]}")
+                update_chess_board(chess_board, black_choice, is_white_turn)
+
+                visualize_game_state(screen)
+                pygame.display.flip()
+                print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
+                changing_turns()
             else:
-                print("Draw by Stalemate!")
-                break
+                if is_check_mate(chess_board, is_white_turn):
+                    break
+                else:
+                    print("Draw by Stalemate!")
+                    break
+    pygame.quit()
