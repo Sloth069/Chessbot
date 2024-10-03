@@ -18,20 +18,8 @@
 7. Improvements: checks and pressuring moves for tempo, stalemate forcing in losing positions, take out pieces from dict
    that are not on the field anymore
 """
-empty_square = 0
-w_piece_dict = {1: 'w_pawn', 2: 'w_rook', 3: 'w_knight', 4: 'w_bishop', 5: 'w_queen', 6: 'w_king'}
-b_piece_dict = {7: 'b_pawn', 8: 'b_rook', 9: 'b_knight', 10: 'b_bishop', 11: 'b_queen', 12: 'b_king'}
-w_king_pos = [7, 4]
-b_king_pos = [0, 4]
-w_king_not_moved = True
-b_king_not_moved = True
-w_h_rook_not_moved = True
-w_a_rook_not_moved = True
-b_h_rook_not_moved = True
-b_a_rook_not_moved = True
-is_white_turn = True
 
-# TODO:
+#   TODO:
 #       - use pygame to implement visual representation of the chessboard
 #       - add a timer to see how long the program needs to make a move
 #       - add promotion rule to pawns *
@@ -50,28 +38,42 @@ is_white_turn = True
 #           1. alpha beta pruning *
 #           2. prioritize checks/heavy pieces/positions on the board
 
+import pygame
+import random
+
+empty_square = 0
+w_piece_dict = {1: 'w_pawn', 2: 'w_rook', 3: 'w_knight', 4: 'w_bishop', 5: 'w_queen', 6: 'w_king'}
+b_piece_dict = {7: 'b_pawn', 8: 'b_rook', 9: 'b_knight', 10: 'b_bishop', 11: 'b_queen', 12: 'b_king'}
+w_king_pos = [7, 4]
+b_king_pos = [0, 4]
+w_king_not_moved = True
+b_king_not_moved = True
+w_h_rook_not_moved = True
+w_a_rook_not_moved = True
+b_h_rook_not_moved = True
+b_a_rook_not_moved = True
+is_white_turn = True
+
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
-"""chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
+chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [7, 7, 7, 7, 7, 7, 7, 7],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [1, 1, 1, 1, 1, 1, 1, 1],
-               [2, 3, 4, 5, 6, 4, 3, 2]]"""
-chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
+               [2, 3, 4, 5, 6, 4, 3, 2]]
+"""chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 6, 0, 0, 2]]
+               [0, 0, 0, 0, 6, 0, 0, 2]]"""
 
 # ------------------------------------------ Pygame Chessboard -------------------------------------------------------
-
-import pygame
 
 pygame.init()
 
@@ -157,19 +159,23 @@ def is_king_in_check(temp_board, is_white_turn):
 
 def is_check_mate(chess_board, is_white_turn):
     if is_white_turn:
-        if is_king_in_check(chess_board, is_white_turn):
-            if not get_white_legal_moves(chess_board):
+        if not get_white_legal_moves(chess_board):
+            if is_king_in_check(chess_board, is_white_turn):
                 print(" Checkmate for Black!")
+                return 'Checkmate'
+            else:
+                print(" Draw by Stalemate!")
+                return 'Stalemate'
 
-                return True
     else:
-        if is_king_in_check(chess_board, is_white_turn):
-            if not get_black_legal_moves(chess_board):
+        if not get_black_legal_moves(chess_board):
+            if is_king_in_check(chess_board, is_white_turn):
                 print(" Checkmate for White!")
+                return 'Checkmate'
+            else:
+                print(" Draw by Stalemate!")
+                return 'Stalemate'
 
-                return True
-
-    return False
 
 
 def simulate_move(chess_board, move):
@@ -213,7 +219,7 @@ def update_chess_board(chess_board, move, is_white_turn):
     chess_board[end_x][end_y] = piece
     chess_board[move[0]][move[1]] = 0
 
-    # promoting pawns on the last rank to queens
+    # promoting pawn on the last rank to queen
     if is_white_turn and piece == 1 and end_x == 0:
         promoted_piece = pawn_promotion(is_white_turn)
         chess_board[end_x][end_y] = promoted_piece
@@ -368,19 +374,19 @@ def get_black_legal_moves(chess_board):
 def white_pawn_movement(chess_board, x, y):
     white_pawn_moves = []
 
-    if 1 <= x <= 7:
+    if 1 < x:
         # moving forward if space ahead is empty
         if chess_board[x - 1][y] == 0:
             white_pawn_moves.append([x, y, x - 1, y])
-        # moving forward 2 spaces if in original position and both are empty
-        if x == 6 and chess_board[x - 1][y] == 0 and chess_board[x - 2][y] == 0:
-            white_pawn_moves.append([x, y, x - 2, y])
         # capturing the piece diagonally right
         if 0 <= y < 7 and 6 < chess_board[x - 1][y + 1] < 13:
             white_pawn_moves.append([x, y, x - 1, y + 1])
         # Capturing the piece diagonally left
         if 0 < y <= 7 and 6 < chess_board[x - 1][y - 1] < 13:
             white_pawn_moves.append([x, y, x - 1, y - 1])
+    # moving forward 2 spaces if in original position and both are empty
+    if x == 6 and chess_board[x - 1][y] == 0 and chess_board[x - 2][y] == 0:
+        white_pawn_moves.append([x, y, x - 2, y])
 
     return white_pawn_moves
 
@@ -388,19 +394,19 @@ def white_pawn_movement(chess_board, x, y):
 def black_pawn_movement(chess_board, x, y):
     black_pawn_moves = []
 
-    if 0 < x <= 7:
+    if x < 7:
         # moving forward if space ahead is empty
         if chess_board[x + 1][y] == 0:
             black_pawn_moves.append([x, y, x + 1, y])
-        # moving forward 2 spaces if in original position and both are empty
-        if x == 1 and chess_board[x + 1][y] == 0 and chess_board[x + 2][y] == 0:
-            black_pawn_moves.append([x, y, x + 2, y])
         # capturing the piece diagonally right
         if 0 <= y < 7 and 0 < chess_board[x + 1][y + 1] < 7:
             black_pawn_moves.append([x, y, x + 1, y + 1])
         # Capturing the piece diagonally left
         if 0 < y <= 7 and 0 < chess_board[x + 1][y - 1] < 7:
             black_pawn_moves.append([x, y, x + 1, y - 1])
+    # moving forward 2 spaces if in original position and both are empty
+    if x == 1 and chess_board[x + 1][y] == 0 and chess_board[x + 2][y] == 0:
+        black_pawn_moves.append([x, y, x + 2, y])
 
     return black_pawn_moves
 
@@ -666,6 +672,7 @@ def black_diagonal_movement(chess_board, x, y):
 
 def white_king_movement(chess_board, x, y):
     white_king_moves = []
+
     king_moves = ((1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1))
 
     for (j, k) in king_moves:
@@ -673,26 +680,29 @@ def white_king_movement(chess_board, x, y):
             if not 0 < chess_board[x + j][y + k] < 7:
                 white_king_moves.append([x, y, x + j, y + k])
 
+    return white_king_moves
+
+
+def castling_white(chess_board, x, y):
+    b_possible_moves = get_black_possible_moves(chess_board)
+    castling_moves = []
+    filtered_moves = [move for move in b_possible_moves if len(move) >= 4]
+
     if w_king_not_moved:
         if w_h_rook_not_moved:
             if chess_board[7][5] == 0 and chess_board[7][6] == 0:
-                if chess_board[7][4] not in generate_opponents_moves(chess_board, is_white_turn) and \
-                        chess_board[7][5] not in generate_opponents_moves(chess_board, is_white_turn) and \
-                        chess_board[7][6] not in generate_opponents_moves(chess_board, is_white_turn):
-                    white_king_moves.append([x, y, 7, 6])
+                if [7, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
+                        [7, 5] not in [[move[2], move[3]] for move in filtered_moves] and \
+                        [7, 6] not in [[move[2], move[3]] for move in filtered_moves]:
+                    castling_moves.append([x, y, 7, 6])
         if w_a_rook_not_moved:
             if chess_board[7][2] == 0 and chess_board[7][3] == 0:
-                if chess_board[7][4] not in generate_opponents_moves(chess_board, is_white_turn) and \
-                        chess_board[7][2] not in generate_opponents_moves(chess_board, is_white_turn) and \
-                        chess_board[7][3] not in generate_opponents_moves(chess_board, is_white_turn):
-                    white_king_moves.append([x, y, 7, 2])
-    print("+", w_king_not_moved)
-    print("++", w_h_rook_not_moved)
-    print("+++", white_king_moves)
+                if [7, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
+                        [7, 2] not in [[move[2], move[3]] for move in filtered_moves] and \
+                        [7, 3] not in [[move[2], move[3]] for move in filtered_moves]:
+                    castling_moves.append([x, y, 7, 2])
 
-    # movement function for white king
-
-    return white_king_moves
+    return castling_moves
 
 
 def black_king_movement(chess_board, x, y):
@@ -704,31 +714,42 @@ def black_king_movement(chess_board, x, y):
             if not 6 < chess_board[x + j][y + k] < 13:
                 black_king_moves.append([x, y, x + j, y + k])
 
-    if b_king_not_moved:
-        if b_h_rook_not_moved:
-            if chess_board[0][5] == 0 and chess_board[0][6] == 0:
-                if chess_board[0][4] not in generate_opponents_moves(chess_board, is_white_turn) and \
-                        chess_board[0][5] not in generate_opponents_moves(chess_board, is_white_turn) and \
-                        chess_board[0][6] not in generate_opponents_moves(chess_board, is_white_turn):
-                    black_king_moves.append([x, y, 0, 6])
-        if w_a_rook_not_moved:
-            if chess_board[0][2] == 0 and chess_board[0][3] == 0:
-                if chess_board[0][4] not in generate_opponents_moves(chess_board, is_white_turn) and \
-                        chess_board[0][2] not in generate_opponents_moves(chess_board, is_white_turn) and \
-                        chess_board[0][3] not in generate_opponents_moves(chess_board, is_white_turn):
-                    black_king_moves.append([x, y, 0, 2])
-
     return black_king_moves
 
 
-# movement function for black king
+def castling_black(chess_board, x, y):
+    w_possible_moves = get_white_possible_moves(chess_board)
+    castling_moves = []
+    filtered_moves = [move for move in w_possible_moves if len(move) >= 4]
 
-# ----------------------------------------- Move Evaluation Algorythm -------------------------------
+    if b_king_not_moved:
+        if b_h_rook_not_moved:
+            if chess_board[0][5] == 0 and chess_board[0][6] == 0:
+                if [0, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
+                        [0, 5] not in [[move[2], move[3]] for move in filtered_moves] and \
+                        [0, 6] not in [[move[2], move[3]] for move in filtered_moves]:
+                    castling_moves.append([x, y, 0, 6])
+        if w_a_rook_not_moved:
+            if chess_board[0][2] == 0 and chess_board[0][3] == 0:
+                if [0, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
+                        [0, 2] not in [[move[2], move[3]] for move in filtered_moves] and \
+                        [0, 3] not in [[move[2], move[3]] for move in filtered_moves]:
+                    castling_moves.append([x, y, 0, 2])
+
+    return castling_moves
+
+    # ----------------------------------------- Move Evaluation Algorythm -------------------------------
 
 
 def minimax(chess_board, depth, is_white_turn, alpha, beta):
-    if depth == 0 or is_check_mate(chess_board, is_white_turn):
+    if depth == 0:
         return evaluate_board_state(chess_board, is_white_turn)
+
+    game_state = is_check_mate(chess_board, is_white_turn)
+    if game_state == 'checkmate':
+        return float('-inf') if is_white_turn else float('inf')
+    elif game_state == 'stalemate':
+        return 0
 
     if is_white_turn:
         max_eval = float('-inf')
@@ -764,26 +785,101 @@ def minimax(chess_board, depth, is_white_turn, alpha, beta):
 def evaluate_board_state(chess_board, is_white_turn):
     # a simple evaluation of the board, that iterates over it and adds the values of the
     # pieces it finds together to find out who has the material advantage
-    piece_values = {1: 1, 2: 5, 3: 3, 4: 3, 5: 8, 6: 100, 7: -1, 8: -5, 9: -3, 10: -3, 11: -8, 12: -100}
+    piece_values = {1: 1, 2: 5, 3: 3, 4: 3, 5: 8, 6: 20, 7: -1, 8: -5, 9: -3, 10: -3, 11: -8, 12: -20}
     chess_board_state = 0
+
+    pawn_board_multiplier = [[8, 8, 8, 8, 8, 8, 8, 8],
+                             [1, 1, 1, 1, 1, 1.5, 1.5, 1.5],
+                             [1, 1, 1, 1.3, 1.3, 1, 1, 1.2],
+                             [1, 1, 1.3, 2, 2, 1.3, 1, 1],
+                             [1, 1, 1.3, 2, 2, 1.3, 1, 1],
+                             [1, 1, 1, 1.3, 1.3, 1, 1, 1.2],
+                             [1, 1, 1, 1, 1, 1.5, 1.5, 1.5],
+                             [8, 8, 8, 8, 8, 8, 8, 8]]
+
+    knight_board_multiplier = [[0.5, 0.6, 0.7, 0.7, 0.7, 0.7, 0.6, 0.5],
+                               [0.6, 0.8, 0.9, 0.9, 0.9, 0.9, 0.8, 0.6],
+                               [0.7, 0.9, 1.3, 1, 1, 1.3, 0.9, 0.7],
+                               [0.7, 0.9, 1, 1.5, 1.5, 1, 0.9, 0.7],
+                               [0.7, 0.9, 1, 1.5, 1.5, 1, 0.9, 0.7],
+                               [0.7, 0.9, 1.3, 1, 1, 1.3, 0.9, 0.7],
+                               [0.6, 0.8, 0.9, 0.9, 0.9, 0.9, 0.8, 0.6],
+                               [0.5, 0.6, 0.7, 0.7, 0.7, 0.7, 0.6, 0.5]]
+
+    bishop_board_multiplier = [[1, 1, 1, 1, 1, 1, 1, 1],
+                               [1, 1, 1, 1, 1, 1, 1, 1],
+                               [1, 1, 1, 1.2, 1.2, 1, 1, 1],
+                               [1, 1.4, 1.4, 1.2, 1.2, 1.4, 1.4, 1],
+                               [1, 1.4, 1.4, 1.2, 1.2, 1.4, 1.4, 1],
+                               [1, 1, 1, 1.2, 1.2, 1, 1, 1],
+                               [1, 1, 1, 1, 1, 1, 1, 1],
+                               [1, 1, 1, 1, 1, 1, 1, 1]]
+
+    rook_board_multiplier = [[1, 1, 1, 1.1, 1.1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1.1, 1.1, 1, 1, 1]]
+
+    queen_board_multiplier = [[1, 1, 1, 1, 1, 1, 1, 1],
+                              [1, 1, 1, 1, 1, 1, 1, 1],
+                              [1, 1, 1, 1, 1, 1.1, 1, 1],
+                              [1, 1, 1, 1.1, 1, 1.1, 1, 1],
+                              [1, 1, 1, 1.1, 1.1, 1, 1, 1],
+                              [1, 1, 1, 1, 1, 1.1, 1, 1],
+                              [1, 1, 1, 1, 1, 1, 1, 1],
+                              [1, 1, 1, 1, 1, 1, 1, 1]]
+
+    king_board_multiplier = [[1, 1, 1.02, 1, 1, 1, 1.06, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1, 1, 1, 1, 1, 1],
+                             [1, 1, 1.02, 1, 1, 1, 1.06, 1]]
+
+    board_multiplier = {1: pawn_board_multiplier, 7: pawn_board_multiplier,
+                        3: knight_board_multiplier, 9: knight_board_multiplier,
+                        4: bishop_board_multiplier, 10: bishop_board_multiplier,
+                        2: rook_board_multiplier, 8: rook_board_multiplier,
+                        5: queen_board_multiplier, 11: queen_board_multiplier,
+                        6: king_board_multiplier, 12: king_board_multiplier}
 
     for x in range(8):
         for y in range(8):
             piece = chess_board[x][y]
             if piece != 0:
-                # print(piece_values.get(piece))
-                chess_board_state += piece_values.get(piece)
+                piece_value = piece_values.get(piece)
+                chosen_multiplier = board_multiplier.get(piece)
+                if chosen_multiplier:
+                    position_multiplier = chosen_multiplier[x][y]
 
-    # print("current chessboard evaluation:", chess_board_state)
+                    chess_board_state += piece_value * position_multiplier
+
     return chess_board_state
 
 
-def find_best_move(chess_board, is_white_turn, depth):
+def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
     best_move = None
-
+    top_moves = []
     if is_white_turn:
         max_eval = float('-inf')
         white_legal_moves = get_white_legal_moves(chess_board)
+
+        x, y = None, None
+        for i in range(8):
+            for j in range(8):
+                if chess_board[i][j] == 6:
+                    x, y = i, j
+                    break
+            if x is not None:
+                break
+
+        white_legal_moves.extend(castling_white(chess_board, x, y))
 
         for move in white_legal_moves:
             temp_board = simulate_move(chess_board, move)
@@ -792,11 +888,27 @@ def find_best_move(chess_board, is_white_turn, depth):
 
             if eval > max_eval:
                 max_eval = eval
-                best_move = move
+                top_moves = [move]
+            elif abs(eval - max_eval) < eval_diff:
+                top_moves.append(move)
+
+                # if best_move:
+            best_move = random.choice(top_moves)
 
     else:
         min_eval = float('inf')
         black_legal_moves = get_black_legal_moves(chess_board)
+
+        x, y = None, None
+        for i in range(8):
+            for j in range(8):
+                if chess_board[i][j] == 12:
+                    x, y = i, j
+                    break
+            if x is not None:
+                break
+
+        black_legal_moves.extend(castling_black(chess_board, x, y))
 
         for move in black_legal_moves:
             temp_board = simulate_move(chess_board, move)
@@ -805,7 +917,12 @@ def find_best_move(chess_board, is_white_turn, depth):
 
             if eval < min_eval:
                 min_eval = eval
-                best_move = move
+                top_moves = [move]
+            elif abs(eval - min_eval) > eval_diff:
+                top_moves.append(move)
+
+                # if best_move:
+            best_move = random.choice(top_moves)
 
     return best_move
 
@@ -830,6 +947,7 @@ if __name__ == '__main__':
             if is_king_in_check(chess_board, is_white_turn):
                 print(" White king is in check")
             best_move = find_best_move(chess_board, is_white_turn, depth)
+            print(best_move)
             if best_move:
                 white_choice = best_move
                 piece_int = chess_board[white_choice[0]][white_choice[1]]
@@ -844,9 +962,6 @@ if __name__ == '__main__':
 
             else:
                 if is_check_mate(chess_board, is_white_turn):
-                    break
-                else:
-                    print("Draw by Stalemate!")
                     break
 
             print(" It´s Blacks turn!")
@@ -869,7 +984,5 @@ if __name__ == '__main__':
             else:
                 if is_check_mate(chess_board, is_white_turn):
                     break
-                else:
-                    print("Draw by Stalemate!")
-                    break
+
     pygame.quit()
