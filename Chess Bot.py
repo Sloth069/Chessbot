@@ -65,13 +65,13 @@ chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [1, 1, 1, 1, 1, 1, 1, 1],
                [2, 3, 4, 5, 6, 4, 3, 2]]
 """chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 6, 0, 0, 2]]"""
+                  [0, 0, 0, 0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 0, 0, 0, 0],
+                  [0, 0, 0, 0, 6, 0, 0, 2]]"""
 
 # ------------------------------------------ Pygame Chessboard -------------------------------------------------------
 
@@ -83,6 +83,7 @@ dimensions = 8
 square = height // dimensions
 screen = pygame.display.set_mode((width, height))
 screen.fill(pygame.Color("white"))
+pygame.time.Clock().tick(10)
 images = {}
 
 pieces = ['w_pawn', 'w_knight', 'w_rook', 'w_bishop', 'w_queen', 'w_king',
@@ -788,23 +789,32 @@ def evaluate_board_state(chess_board, is_white_turn):
     piece_values = {1: 1, 2: 5, 3: 3, 4: 3, 5: 8, 6: 20, 7: -1, 8: -5, 9: -3, 10: -3, 11: -8, 12: -20}
     chess_board_state = 0
 
-    pawn_board_multiplier = [[8, 8, 8, 8, 8, 8, 8, 8],
-                             [1, 1, 1, 1, 1, 1.5, 1.5, 1.5],
-                             [1, 1, 1, 1.3, 1.3, 1, 1, 1.2],
-                             [1, 1, 1.3, 2, 2, 1.3, 1, 1],
-                             [1, 1, 1.3, 2, 2, 1.3, 1, 1],
-                             [1, 1, 1, 1.3, 1.3, 1, 1, 1.2],
-                             [1, 1, 1, 1, 1, 1.5, 1.5, 1.5],
-                             [8, 8, 8, 8, 8, 8, 8, 8]]
+    white_pawn_board_multiplier = [[8, 8, 8, 8, 8, 8, 8, 8],
+                                   [1, 1, 1, 1, 1, 1, 1, 1],
+                                   [1, 1, 1, 1.3, 1.3, 1, 1, 1],
+                                   [1, 1, 1.3, 2, 2, 1.3, 1, 1],
+                                   [1, 1, 1.3, 2, 2, 1.3, 1, 1],
+                                   [1, 1, 1, 1.3, 1.3, 1, 1, 1.2],
+                                   [1, 1, 1, 1, 1, 1.5, 1.5, 1.5],
+                                   [1, 1, 1, 1, 1, 1, 1, 1]]
 
-    knight_board_multiplier = [[0.5, 0.6, 0.7, 0.7, 0.7, 0.7, 0.6, 0.5],
+    black_pawn_board_multiplier = [[1, 1, 1, 1, 1, 1, 1, 1],
+                                   [1, 1, 1, 1, 1, 1.5, 1.5, 1.5],
+                                   [1, 1, 1, 1.3, 1.3, 1, 1, 1.2],
+                                   [1, 1, 1.3, 2, 2, 1.3, 1, 1],
+                                   [1, 1, 1.3, 2, 2, 1.3, 1, 1],
+                                   [1, 1, 1, 1.3, 1.3, 1, 1, 1],
+                                   [1, 1, 1, 1, 1, 1, 1, 1],
+                                   [8, 8, 8, 8, 8, 8, 8, 8]]
+
+    knight_board_multiplier = [[0.5, 0.9, 0.7, 0.7, 0.7, 0.7, 0.9, 0.5],
                                [0.6, 0.8, 0.9, 0.9, 0.9, 0.9, 0.8, 0.6],
-                               [0.7, 0.9, 1.3, 1, 1, 1.3, 0.9, 0.7],
+                               [0.7, 0.9, 1.2, 1, 1, 1.2, 0.9, 0.7],
                                [0.7, 0.9, 1, 1.5, 1.5, 1, 0.9, 0.7],
                                [0.7, 0.9, 1, 1.5, 1.5, 1, 0.9, 0.7],
-                               [0.7, 0.9, 1.3, 1, 1, 1.3, 0.9, 0.7],
+                               [0.7, 0.9, 1.2, 1, 1, 1.2, 0.9, 0.7],
                                [0.6, 0.8, 0.9, 0.9, 0.9, 0.9, 0.8, 0.6],
-                               [0.5, 0.6, 0.7, 0.7, 0.7, 0.7, 0.6, 0.5]]
+                               [0.5, 0.9, 0.7, 0.7, 0.7, 0.7, 0.9, 0.5]]
 
     bishop_board_multiplier = [[1, 1, 1, 1, 1, 1, 1, 1],
                                [1, 1, 1, 1, 1, 1, 1, 1],
@@ -842,7 +852,7 @@ def evaluate_board_state(chess_board, is_white_turn):
                              [1, 1, 1, 1, 1, 1, 1, 1],
                              [1, 1, 1.02, 1, 1, 1, 1.06, 1]]
 
-    board_multiplier = {1: pawn_board_multiplier, 7: pawn_board_multiplier,
+    board_multiplier = {1: white_pawn_board_multiplier, 7: black_pawn_board_multiplier,
                         3: knight_board_multiplier, 9: knight_board_multiplier,
                         4: bishop_board_multiplier, 10: bishop_board_multiplier,
                         2: rook_board_multiplier, 8: rook_board_multiplier,
@@ -918,7 +928,7 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
             if eval < min_eval:
                 min_eval = eval
                 top_moves = [move]
-            elif abs(eval - min_eval) > eval_diff:
+            elif abs(eval - min_eval) < eval_diff:
                 top_moves.append(move)
 
                 # if best_move:
@@ -932,7 +942,34 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
 
 depth = 4
 
+
+def get_player_move():
+    while True:
+        try:
+            from_x = int(input("Enter the starting row (0-7): "))
+            from_y = int(input("Enter the starting column (0-7): "))
+            to_x = int(input("Enter the target row (0-7): "))
+            to_y = int(input("Enter the target column (0-7): "))
+            return (from_x, from_y, to_x, to_y)
+        except ValueError:
+            print("Invalid input, please enter numbers between 0 and 7.")
+
+
 if __name__ == '__main__':
+    print("Choose game mode:")
+    print("1. Play as White")
+    print("2. Play as Black")
+    print("3. AI vs AI")
+
+    game_mode = input("Enter 1, 2, or 3: ")
+
+    if game_mode not in ['1', '2', '3']:
+        print("Invalid selection, Please enter 1, 2 or 3")
+
+    player_is_white = (game_mode == '1')
+    player_is_black = (game_mode == '2')
+    ai_vs_ai = (game_mode == '3')
+
     running = True
     while running:
         for event in pygame.event.get():
@@ -942,47 +979,64 @@ if __name__ == '__main__':
         pygame.display.flip()
         # for i in range(8):
         # print(chess_board[i])
-        while is_white_turn:
+        if is_white_turn:
             print(" Its Whites turn!")
             if is_king_in_check(chess_board, is_white_turn):
                 print(" White king is in check")
-            best_move = find_best_move(chess_board, is_white_turn, depth)
-            print(best_move)
-            if best_move:
-                white_choice = best_move
-                piece_int = chess_board[white_choice[0]][white_choice[1]]
-                piece_str = w_piece_dict.get(piece_int)
-                print(f" White moves {piece_str} from "
-                      f"{white_choice[0], white_choice[1]} to --> {white_choice[2], white_choice[3]}")
-                update_chess_board(chess_board, white_choice, is_white_turn)
-                visualize_game_state(screen)
-                pygame.display.flip()
-                print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
-                changing_turns()
 
-            else:
+            if player_is_white:
                 if is_check_mate(chess_board, is_white_turn):
                     break
+                white_choice = get_player_move()
+                if white_choice:
+                    update_chess_board(chess_board, white_choice, is_white_turn)
 
+            else:
+                best_move = find_best_move(chess_board, is_white_turn, depth)
+                if best_move:
+                    white_choice = best_move
+                    piece_int = chess_board[white_choice[0]][white_choice[1]]
+                    piece_str = w_piece_dict.get(piece_int)
+                    print(f" White moves {piece_str} from "
+                          f"{white_choice[0], white_choice[1]} to --> {white_choice[2], white_choice[3]}")
+                    update_chess_board(chess_board, white_choice, is_white_turn)
+                else:
+                    if is_check_mate(chess_board, is_white_turn):
+                        break
+
+            visualize_game_state(screen)
+            pygame.display.flip()
+            print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
+            changing_turns()
+
+        else:
             print(" It´s Blacks turn!")
             if is_king_in_check(chess_board, is_white_turn):
                 print(" Black king is in check")
-            best_move = find_best_move(chess_board, is_white_turn, depth)
 
-            if best_move:
-                black_choice = best_move
-                piece_int = chess_board[black_choice[0]][black_choice[1]]
-                piece_str = b_piece_dict.get(piece_int)
-                print(f" Black moves {piece_str} from "
-                      f"{black_choice[0], black_choice[1]} to --> {black_choice[2], black_choice[3]}")
-                update_chess_board(chess_board, black_choice, is_white_turn)
-
-                visualize_game_state(screen)
-                pygame.display.flip()
-                print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
-                changing_turns()
-            else:
+            if player_is_black:
                 if is_check_mate(chess_board, is_white_turn):
                     break
+                black_choice = get_player_move()
+                if black_choice:
+                    update_chess_board(chess_board, black_choice, is_white_turn)
+
+            else:
+                best_move = find_best_move(chess_board, is_white_turn, depth)
+                if best_move:
+                    black_choice = best_move
+                    piece_int = chess_board[black_choice[0]][black_choice[1]]
+                    piece_str = b_piece_dict.get(piece_int)
+                    print(f" Black moves {piece_str} from "
+                          f"{black_choice[0], black_choice[1]} to --> {black_choice[2], black_choice[3]}")
+                    update_chess_board(chess_board, black_choice, is_white_turn)
+                else:
+                    if is_check_mate(chess_board, is_white_turn):
+                        break
+
+            visualize_game_state(screen)
+            pygame.display.flip()
+            print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
+            changing_turns()
 
     pygame.quit()
