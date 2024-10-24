@@ -76,7 +76,7 @@ is_white_turn = True
                [1, 1, 1, 1, 1, 1, 1, 1],
                [2, 3, 4, 5, 6, 4, 3, 2]]"""
 chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
-               [0, 2, 0, 0, 0, 0, 0, 0],
+               [0, 2, 0, 0, 5, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 5, 0, 0, 0, 0, 0, 0],
@@ -917,10 +917,12 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
         for move in white_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
-            eval = minimax(temp_board, depth - 1, False, float('-inf'), float('inf'))
-
-            if eval == float('-inf'):
+            game_state = is_check_mate(chess_board, not is_white_turn)
+            if game_state == 'Checkmate':
+                print("++", move)
                 return move
+
+            eval = minimax(temp_board, depth - 1, False, float('-inf'), float('inf'))
 
             if eval > max_eval:
                 max_eval = eval
@@ -950,10 +952,11 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
         for move in black_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
-            eval = minimax(temp_board, depth - 1, True, float('-inf'), float('inf'))
-
-            if eval == float('inf'):
+            game_state = is_check_mate(chess_board, not is_white_turn)
+            if game_state == 'Checkmate':
                 return move
+
+            eval = minimax(temp_board, depth - 1, True, float('-inf'), float('inf'))
 
             if eval < min_eval:
                 min_eval = eval
