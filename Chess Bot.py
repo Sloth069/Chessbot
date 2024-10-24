@@ -75,14 +75,14 @@ is_white_turn = True
                [0, 0, 0, 0, 0, 0, 0, 0],
                [1, 1, 1, 1, 1, 1, 1, 1],
                [2, 3, 4, 5, 6, 4, 3, 2]]"""
-chess_board = [[0, 0, 0, 0, 12, 0, 0, 8],
+chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
+               [0, 2, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 5, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 8, 8, 0, 8],
-               [0, 0, 0, 0, 0, 6, 0, 0]]
+               [0, 0, 0, 0, 6, 0, 0, 0]]
 
 # ------------------------------------------ Pygame Chessboard -------------------------------------------------------
 
@@ -698,18 +698,20 @@ def castling_white(chess_board, x, y):
     filtered_moves = [move for move in b_possible_moves if len(move) >= 4]
 
     if w_king_not_moved:
-        if w_h_rook_not_moved:
-            if chess_board[7][5] == 0 and chess_board[7][6] == 0:
-                if [7, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
-                        [7, 5] not in [[move[2], move[3]] for move in filtered_moves] and \
-                        [7, 6] not in [[move[2], move[3]] for move in filtered_moves]:
-                    castling_moves.append([x, y, 7, 6])
-        if w_a_rook_not_moved:
-            if chess_board[7][2] == 0 and chess_board[7][3] == 0:
-                if [7, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
-                        [7, 2] not in [[move[2], move[3]] for move in filtered_moves] and \
-                        [7, 3] not in [[move[2], move[3]] for move in filtered_moves]:
-                    castling_moves.append([x, y, 7, 2])
+        if chess_board[7][7] == 2:
+            if w_h_rook_not_moved:
+                if chess_board[7][5] == 0 and chess_board[7][6] == 0:
+                    if [7, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
+                            [7, 5] not in [[move[2], move[3]] for move in filtered_moves] and \
+                            [7, 6] not in [[move[2], move[3]] for move in filtered_moves]:
+                        castling_moves.append([x, y, 7, 6])
+        if chess_board[7][0] == 2:
+            if w_a_rook_not_moved:
+                if chess_board[7][2] == 0 and chess_board[7][3] == 0:
+                    if [7, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
+                            [7, 2] not in [[move[2], move[3]] for move in filtered_moves] and \
+                            [7, 3] not in [[move[2], move[3]] for move in filtered_moves]:
+                        castling_moves.append([x, y, 7, 2])
 
     return castling_moves
 
@@ -732,18 +734,20 @@ def castling_black(chess_board, x, y):
     filtered_moves = [move for move in w_possible_moves if len(move) >= 4]
 
     if b_king_not_moved:
-        if b_h_rook_not_moved:
-            if chess_board[0][5] == 0 and chess_board[0][6] == 0:
-                if [0, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
-                        [0, 5] not in [[move[2], move[3]] for move in filtered_moves] and \
-                        [0, 6] not in [[move[2], move[3]] for move in filtered_moves]:
-                    castling_moves.append([x, y, 0, 6])
-        if w_a_rook_not_moved:
-            if chess_board[0][2] == 0 and chess_board[0][3] == 0:
-                if [0, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
-                        [0, 2] not in [[move[2], move[3]] for move in filtered_moves] and \
-                        [0, 3] not in [[move[2], move[3]] for move in filtered_moves]:
-                    castling_moves.append([x, y, 0, 2])
+        if chess_board[0][7] == 8:
+            if b_h_rook_not_moved:
+                if chess_board[0][5] == 0 and chess_board[0][6] == 0:
+                    if [0, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
+                            [0, 5] not in [[move[2], move[3]] for move in filtered_moves] and \
+                            [0, 6] not in [[move[2], move[3]] for move in filtered_moves]:
+                        castling_moves.append([x, y, 0, 6])
+        if chess_board[0][0] == 8:
+            if w_a_rook_not_moved:
+                if chess_board[0][2] == 0 and chess_board[0][3] == 0:
+                    if [0, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
+                            [0, 2] not in [[move[2], move[3]] for move in filtered_moves] and \
+                            [0, 3] not in [[move[2], move[3]] for move in filtered_moves]:
+                        castling_moves.append([x, y, 0, 2])
 
     return castling_moves
 
@@ -754,7 +758,7 @@ def minimax(chess_board, depth, is_white_turn, alpha, beta):
     if depth == 0:
         return evaluate_board_state(chess_board, is_white_turn)
 
-    game_state = is_check_mate(chess_board, is_white_turn)
+    """game_state = is_check_mate(chess_board, is_white_turn)
     if game_state == 'Checkmate':
         if is_white_turn:
             return float('inf')
@@ -762,7 +766,7 @@ def minimax(chess_board, depth, is_white_turn, alpha, beta):
             return float('-inf')
 
     elif game_state == 'Stalemate':
-        return 0
+        return 0"""
 
     if is_white_turn:
         max_eval = float('-inf')
@@ -883,9 +887,9 @@ def evaluate_board_state(chess_board, is_white_turn):
     game_state = is_check_mate(chess_board, is_white_turn)
     if game_state == 'Checkmate':
         if is_white_turn:
-            chess_board_state = -1000
+            chess_board_state = float('-inf')
         else:
-            chess_board_state = 1000
+            chess_board_state = float('inf')
     elif game_state == 'Stalemate':
         chess_board_state = 0
 
@@ -915,14 +919,16 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
 
             eval = minimax(temp_board, depth - 1, False, float('-inf'), float('inf'))
 
+            if eval == float('-inf'):
+                return move
+
             if eval > max_eval:
                 max_eval = eval
                 top_moves = [move]
             elif abs(eval - max_eval) < eval_diff:
                 top_moves.append(move)
 
-                # if best_move:
-            # print("+++", top_moves)
+            print("+++", top_moves)
             best_move = random.choice(top_moves)
 
     else:
@@ -939,11 +945,15 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
                 break
 
         black_legal_moves.extend(castling_black(chess_board, x, y))
+        print("++", black_legal_moves)
 
         for move in black_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
             eval = minimax(temp_board, depth - 1, True, float('-inf'), float('inf'))
+
+            if eval == float('inf'):
+                return move
 
             if eval < min_eval:
                 min_eval = eval
