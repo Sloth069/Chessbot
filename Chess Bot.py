@@ -50,8 +50,6 @@
 import pygame
 import random
 
-from pygame import MOUSEBUTTONUP
-
 empty_square = 0
 w_piece_dict = {1: 'w_pawn', 2: 'w_rook', 3: 'w_knight', 4: 'w_bishop', 5: 'w_queen', 6: 'w_king'}
 b_piece_dict = {7: 'b_pawn', 8: 'b_rook', 9: 'b_knight', 10: 'b_bishop', 11: 'b_queen', 12: 'b_king'}
@@ -67,22 +65,22 @@ is_white_turn = True
 
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
-"""chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
+chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [7, 7, 7, 7, 7, 7, 7, 7],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [1, 1, 1, 1, 1, 1, 1, 1],
-               [2, 3, 4, 5, 6, 4, 3, 2]]"""
-chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
-               [0, 2, 0, 0, 5, 0, 0, 0],
+               [2, 3, 4, 5, 6, 4, 3, 2]]
+"""chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 5, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 0, 0, 11, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 6, 0, 0, 0]]
+               [0, 0, 0, 0, 0, 0, 8, 0],
+               [0, 0, 0, 0, 6, 0, 0, 0]]"""
 
 # ------------------------------------------ Pygame Chessboard -------------------------------------------------------
 
@@ -160,7 +158,8 @@ def is_king_in_check(temp_board, is_white_turn):
             elif not is_white_turn and temp_board[x][y] == 12:
                 king_pos = [x, y]
 
-    for move in generate_opponents_moves(temp_board, is_white_turn):
+    opponents_moves = generate_opponents_moves(temp_board, is_white_turn)
+    for move in opponents_moves:
         if [move[2], move[3]] == king_pos:
             return True
 
@@ -168,7 +167,7 @@ def is_king_in_check(temp_board, is_white_turn):
 
 
 def is_check_mate(chess_board, is_white_turn):
-    if is_white_turn:
+    if not is_white_turn:
         if not get_white_legal_moves(chess_board):
             if is_king_in_check(chess_board, is_white_turn):
                 return 'Checkmate'
@@ -177,7 +176,7 @@ def is_check_mate(chess_board, is_white_turn):
 
     else:
         if not get_black_legal_moves(chess_board):
-            if is_king_in_check(chess_board, is_white_turn):
+            if is_king_in_check(chess_board, not is_white_turn):
                 return 'Checkmate'
             else:
                 return 'Stalemate'
@@ -244,12 +243,12 @@ def update_chess_board(chess_board, move, is_white_turn):
 
         # moving the h-file rook for short castle white
         if move[1] == 4 and chess_board[7][move[3]] == chess_board[7][6]:
-            if chess_board[0][6] == 6:
+            if chess_board[7][6] == 6:
                 chess_board[7][5] = chess_board[7][7]
                 chess_board[7][7] = 0
         # moving the a-file rook for long castle white
         if move[1] == 4 and chess_board[7][move[3]] == chess_board[7][2]:
-            if chess_board[0][6] == 6:
+            if chess_board[7][2] == 6:
                 chess_board[7][3] = chess_board[7][0]
                 chess_board[7][0] = 0
 
@@ -266,7 +265,7 @@ def update_chess_board(chess_board, move, is_white_turn):
                 chess_board[0][7] = 0
         # moving the a-file rook for long castle black
         if move[1] == 4 and chess_board[0][move[3]] == chess_board[0][2]:
-            if chess_board[0][6] == 12:
+            if chess_board[0][2] == 12:
                 chess_board[0][3] = chess_board[0][0]
                 chess_board[0][0] = 0
 
@@ -371,7 +370,7 @@ def get_black_legal_moves(chess_board):
 
     for move in flattened_black_possible_moves:
         current_x, current_y, new_x, new_y = move
-        if is_move_legal(chess_board, move, is_white_turn):
+        if is_move_legal(chess_board, move, is_white_turn=False):
             black_legal_moves.append(move)
 
     return black_legal_moves
@@ -704,14 +703,14 @@ def castling_white(chess_board, x, y):
                     if [7, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
                             [7, 5] not in [[move[2], move[3]] for move in filtered_moves] and \
                             [7, 6] not in [[move[2], move[3]] for move in filtered_moves]:
-                        castling_moves.append([x, y, 7, 6])
+                        castling_moves.append([7, 4, 7, 6])
         if chess_board[7][0] == 2:
             if w_a_rook_not_moved:
-                if chess_board[7][2] == 0 and chess_board[7][3] == 0:
+                if chess_board[7][1] == 0 and chess_board[7][2] == 0 and chess_board[7][3] == 0:
                     if [7, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
                             [7, 2] not in [[move[2], move[3]] for move in filtered_moves] and \
                             [7, 3] not in [[move[2], move[3]] for move in filtered_moves]:
-                        castling_moves.append([x, y, 7, 2])
+                        castling_moves.append([7, 4, 7, 2])
 
     return castling_moves
 
@@ -740,14 +739,14 @@ def castling_black(chess_board, x, y):
                     if [0, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
                             [0, 5] not in [[move[2], move[3]] for move in filtered_moves] and \
                             [0, 6] not in [[move[2], move[3]] for move in filtered_moves]:
-                        castling_moves.append([x, y, 0, 6])
+                        castling_moves.append([0, 4, 0, 6])
         if chess_board[0][0] == 8:
-            if w_a_rook_not_moved:
-                if chess_board[0][2] == 0 and chess_board[0][3] == 0:
+            if b_a_rook_not_moved:
+                if chess_board[0][1] == 0 and chess_board[0][2] == 0 and chess_board[0][3] == 0:
                     if [0, 4] not in [[move[2], move[3]] for move in filtered_moves] and \
                             [0, 2] not in [[move[2], move[3]] for move in filtered_moves] and \
                             [0, 3] not in [[move[2], move[3]] for move in filtered_moves]:
-                        castling_moves.append([x, y, 0, 2])
+                        castling_moves.append([0, 4, 0, 2])
 
     return castling_moves
 
@@ -887,9 +886,9 @@ def evaluate_board_state(chess_board, is_white_turn):
     game_state = is_check_mate(chess_board, is_white_turn)
     if game_state == 'Checkmate':
         if is_white_turn:
-            chess_board_state = float('-inf')
-        else:
             chess_board_state = float('inf')
+        else:
+            chess_board_state = float('-inf')
     elif game_state == 'Stalemate':
         chess_board_state = 0
 
@@ -902,6 +901,7 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
     if is_white_turn:
         max_eval = float('-inf')
         white_legal_moves = get_white_legal_moves(chess_board)
+        print("White legal moves:", white_legal_moves)
 
         x, y = None, None
         for i in range(8):
@@ -917,9 +917,8 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
         for move in white_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
-            game_state = is_check_mate(chess_board, not is_white_turn)
+            game_state = is_check_mate(temp_board, is_white_turn)
             if game_state == 'Checkmate':
-                print("++", move)
                 return move
 
             eval = minimax(temp_board, depth - 1, False, float('-inf'), float('inf'))
@@ -929,9 +928,6 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
                 top_moves = [move]
             elif abs(eval - max_eval) < eval_diff:
                 top_moves.append(move)
-
-            print("+++", top_moves)
-            best_move = random.choice(top_moves)
 
     else:
         min_eval = float('inf')
@@ -947,12 +943,11 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
                 break
 
         black_legal_moves.extend(castling_black(chess_board, x, y))
-        print("++", black_legal_moves)
 
         for move in black_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
-            game_state = is_check_mate(chess_board, not is_white_turn)
+            game_state = is_check_mate(temp_board, is_white_turn)
             if game_state == 'Checkmate':
                 return move
 
@@ -964,9 +959,8 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.1):
             elif abs(eval - min_eval) < eval_diff:
                 top_moves.append(move)
 
-                # if best_move:
-            print("+++", top_moves)
-            best_move = random.choice(top_moves)
+    if top_moves:
+        best_move = random.choice(top_moves)
 
     return best_move
 
@@ -1087,7 +1081,7 @@ def game_loop(screen, chess_board, depth):
                 print(" Black king is in check")
 
             if player_is_black:
-                game_state = is_check_mate(chess_board, is_white_turn)
+                game_state = is_check_mate(chess_board, not is_white_turn)
                 if game_state == 'Checkmate':
                     print(" Checkmate for White!")
                     running = False
@@ -1112,7 +1106,7 @@ def game_loop(screen, chess_board, depth):
                           f"{black_choice[0], black_choice[1]} to --> {black_choice[2], black_choice[3]}")
                     update_chess_board(chess_board, black_choice, is_white_turn)
                 else:
-                    game_state = is_check_mate(chess_board, is_white_turn)
+                    game_state = is_check_mate(chess_board, not is_white_turn)
                     if game_state == 'Checkmate':
                         print(" Checkmate for White!")
                         running = False
@@ -1131,6 +1125,7 @@ def game_loop(screen, chess_board, depth):
 
 
 if __name__ == '__main__':
+    print(get_black_legal_moves(chess_board))
     pygame.init()
 
     width = 800
@@ -1142,7 +1137,7 @@ if __name__ == '__main__':
     screen.fill(pygame.Color("white"))
     pygame.time.Clock().tick(10)
 
-    depth = 4
+    depth = 2
 
     game_loop(screen, chess_board, depth)
 
