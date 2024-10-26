@@ -53,6 +53,7 @@ import random
 empty_square = 0
 w_piece_dict = {1: 'w_pawn', 2: 'w_rook', 3: 'w_knight', 4: 'w_bishop', 5: 'w_queen', 6: 'w_king'}
 b_piece_dict = {7: 'b_pawn', 8: 'b_rook', 9: 'b_knight', 10: 'b_bishop', 11: 'b_queen', 12: 'b_king'}
+computed_moves = {}
 w_king_pos = [7, 4]
 b_king_pos = [0, 4]
 w_king_not_moved = True
@@ -65,22 +66,22 @@ is_white_turn = True
 
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
-chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
+"""chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [7, 7, 7, 7, 7, 7, 7, 7],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [1, 1, 1, 1, 1, 1, 1, 1],
-               [2, 3, 4, 5, 6, 4, 3, 2]]
-"""chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
-               [0, 2, 0, 0, 0, 0, 0, 0],
+               [2, 3, 4, 5, 6, 4, 3, 2]]"""
+chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
+               [0, 2, 0, 0, 5, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 5, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 6, 0, 0, 0]]"""
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 6, 0, 0, 0]]
 
 # ------------------------------------------ Pygame Chessboard -------------------------------------------------------
 
@@ -177,6 +178,7 @@ def is_check_mate(chess_board, is_white_turn):
     else:
         if not get_black_legal_moves(chess_board):
             if is_king_in_check(chess_board, not is_white_turn):
+                print("bro pls")
                 return 'Checkmate'
             else:
                 return 'Stalemate'
@@ -782,19 +784,28 @@ def prioritize_moves(moves, chess_board):
     return capture_moves, check_moves, other_moves
 
 
-def minimax(chess_board, depth, is_white_turn, alpha, beta):
+def get_board_key(chess_board, is_white_turn):
+    board_key = (tuple(tuple(row) for row in chess_board), is_white_turn)
+    return board_key
+
+
+def minimax(chess_board, depth, is_white_turn, alpha, beta, cache=None):
+    if cache is None:
+        cache = computed_moves
+    board_key = get_board_key(chess_board, is_white_turn)
+    if board_key in computed_moves:
+        return cache[board_key]
+
     if depth == 0:
-        return evaluate_board_state(chess_board, is_white_turn)
+        eval_score = evaluate_board_state(chess_board, is_white_turn)
+        cache[board_key] = eval_score
+        return eval_score
 
-    """game_state = is_check_mate(chess_board, is_white_turn)
+    game_state = is_check_mate(chess_board, is_white_turn)
     if game_state == 'Checkmate':
-        if is_white_turn:
-            return float('inf')
-        else:
-            return float('-inf')
-
-    elif game_state == 'Stalemate':
-        return 0"""
+        eval_score = float('inf') if is_white_turn else float('-inf')
+        cache[board_key] = eval_score
+        return eval_score
 
     if is_white_turn:
         max_eval = float('-inf')
@@ -803,12 +814,13 @@ def minimax(chess_board, depth, is_white_turn, alpha, beta):
         for move in white_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
-            eval = minimax(temp_board, depth - 1, False, alpha, beta)
+            eval = minimax(temp_board, depth - 1, False, alpha, beta, cache)
             max_eval = max(max_eval, eval)
             alpha = max(alpha, eval)
             if beta <= alpha:
                 break
 
+        cache[board_key] = max_eval
         return max_eval
 
     else:
@@ -818,12 +830,13 @@ def minimax(chess_board, depth, is_white_turn, alpha, beta):
         for move in black_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
-            eval = minimax(temp_board, depth - 1, True, alpha, beta)
+            eval = minimax(temp_board, depth - 1, True, alpha, beta, cache)
             min_eval = min(min_eval, eval)
             beta = min(beta, eval)
             if beta <= alpha:
                 break
 
+        cache[board_key] = min_eval
         return min_eval
 
 
@@ -940,10 +953,10 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
         for move in white_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
-            if is_king_in_check(temp_board, is_white_turn):
-                game_state = is_check_mate(temp_board, is_white_turn)
-                if game_state == 'Checkmate':
-                    return move
+            game_state = is_check_mate(temp_board, is_white_turn)
+            if game_state == 'Checkmate':
+                print("meow", move)
+                return move
 
             eval = minimax(temp_board, depth - 1, False, alpha, beta)
 
@@ -951,14 +964,11 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
                 max_eval = eval
                 top_moves = [move]
                 alpha = max(alpha, eval)
-                if alpha >= beta:
-                    break
-
             elif abs(eval - max_eval) < eval_diff:
                 top_moves.append(move)
 
-            if white_legal_moves and not top_moves:
-                top_moves = white_legal_moves
+            if alpha >= beta:
+                break
 
     else:
         min_eval = float('inf')
@@ -968,10 +978,9 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
         for move in black_legal_moves:
             temp_board = simulate_move(chess_board, move)
 
-            if is_king_in_check(temp_board, is_white_turn):
-                game_state = is_check_mate(temp_board, is_white_turn)
-                if game_state == 'Checkmate':
-                    return move
+            game_state = is_check_mate(temp_board, is_white_turn)
+            if game_state == 'Checkmate':
+                return move
 
             eval = minimax(temp_board, depth - 1, True, alpha, beta)
 
@@ -979,17 +988,19 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
                 min_eval = eval
                 top_moves = [move]
                 beta = min(beta, eval)
-                if alpha >= beta:
-                    break
-
             elif abs(eval - min_eval) < eval_diff:
                 top_moves.append(move)
 
-            if black_legal_moves and not top_moves:
-                top_moves = black_legal_moves
+            if alpha >= beta:
+                break
 
     if top_moves:
         best_move = random.choice(top_moves)
+    else:
+        if is_white_turn:
+            best_move = random.choice(get_white_legal_moves(chess_board))
+        else:
+            best_move = random.choice(get_black_legal_moves(chess_board))
 
     return best_move
 
@@ -1059,6 +1070,7 @@ def game_loop(screen, chess_board, depth):
         # for i in range(8):
         # print(chess_board[i])
         if is_white_turn:
+            computed_moves.clear()
             print(" Its Whites turn!")
             if is_king_in_check(chess_board, is_white_turn):
                 print(" White king is in check")
@@ -1072,6 +1084,7 @@ def game_loop(screen, chess_board, depth):
                 if game_state == 'Stalemate':
                     print(" Draw by Stalemate!")
                     running = False
+
                     break
 
                 white_choice = get_player_move()
@@ -1080,7 +1093,6 @@ def game_loop(screen, chess_board, depth):
 
             else:
                 best_move = find_best_move(chess_board, is_white_turn, depth)
-                print("meow", best_move)
                 if best_move:
                     white_choice = best_move
                     piece_int = chess_board[white_choice[0]][white_choice[1]]
@@ -1106,12 +1118,13 @@ def game_loop(screen, chess_board, depth):
             changing_turns()
 
         else:
+            computed_moves.clear()
             print(" It´s Blacks turn!")
             if is_king_in_check(chess_board, is_white_turn):
                 print(" Black king is in check")
 
             if player_is_black:
-                game_state = is_check_mate(chess_board, not is_white_turn)
+                game_state = is_check_mate(chess_board, is_white_turn)
                 if game_state == 'Checkmate':
                     print(" Checkmate for White!")
                     running = False
@@ -1126,7 +1139,7 @@ def game_loop(screen, chess_board, depth):
                     update_chess_board(chess_board, black_choice, is_white_turn)
 
             else:
-
+                print("woof", get_black_legal_moves(chess_board))
                 best_move = find_best_move(chess_board, is_white_turn, depth)
                 if best_move:
                     black_choice = best_move
@@ -1136,7 +1149,7 @@ def game_loop(screen, chess_board, depth):
                           f"{black_choice[0], black_choice[1]} to --> {black_choice[2], black_choice[3]}")
                     update_chess_board(chess_board, black_choice, is_white_turn)
                 else:
-                    game_state = is_check_mate(chess_board, not is_white_turn)
+                    game_state = is_check_mate(chess_board, is_white_turn)
                     if game_state == 'Checkmate':
                         print(" Checkmate for White!")
                         running = False
