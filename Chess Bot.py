@@ -75,9 +75,9 @@ is_white_turn = True
                [1, 1, 1, 1, 1, 1, 1, 1],
                [2, 3, 4, 5, 6, 4, 3, 2]]"""
 chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 2, 0],
+               [0, 0, 0, 0, 0, 0, 2, 2],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 5, 0],
+               [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
@@ -146,7 +146,6 @@ def generate_opponents_moves(chess_board, is_white_turn):
         legal_moves = [t for xs in get_black_possible_moves(chess_board) for t in xs]
     else:
         legal_moves = [t for xs in get_white_possible_moves(chess_board) for t in xs]
-    print(legal_moves)
 
     return legal_moves
 
@@ -163,6 +162,7 @@ def is_king_in_check(temp_board, is_white_turn):
 
     opponents_moves = generate_opponents_moves(temp_board, is_white_turn)
     for move in opponents_moves:
+        print("wop", move)
         if [move[2], move[3]] == king_pos:
             return True
 
@@ -171,18 +171,22 @@ def is_king_in_check(temp_board, is_white_turn):
 
 def is_check_mate(chess_board, is_white_turn):
     if is_white_turn:
-        if not get_black_legal_moves(chess_board, is_white_turn):
-            if is_king_in_check(chess_board, not is_white_turn):
+        if not get_black_legal_moves(chess_board, not is_white_turn):
+            print(get_black_legal_moves(chess_board, not is_white_turn))
+            if is_king_in_check(chess_board, False):
+                print("yippie")
                 return 'Checkmate'
             else:
                 return 'Stalemate'
 
     else:
         if not get_white_legal_moves(chess_board, is_white_turn):
-            if is_king_in_check(chess_board, not is_white_turn):
+            if is_king_in_check(chess_board, is_white_turn):
                 return 'Checkmate'
             else:
                 return 'Stalemate'
+
+    return None
 
 
 def simulate_move(chess_board, move):
@@ -336,13 +340,9 @@ def get_white_legal_moves(chess_board, is_white_turn):
     flattened_white_possible_moves = [t for xs in flattened_white_possible_moves for t in xs]
 
     for move in flattened_white_possible_moves:
-        if isinstance(move, list) and len(move) == 4:
-            start_x, start_y, new_x, new_y = move
-            if is_move_legal(chess_board, move, is_white_turn):
-                white_legal_moves.append(move)
-            else:
-                print("Invalid move", move)
-    # print(white_legal_moves)
+        start_x, start_y, new_x, new_y = move
+        if is_move_legal(chess_board, move, is_white_turn):
+            white_legal_moves.append(move)
 
     return white_legal_moves
 
@@ -374,12 +374,9 @@ def get_black_legal_moves(chess_board, is_white_turn):
     flattened_black_possible_moves = [t for xs in flattened_black_possible_moves for t in xs]
 
     for move in flattened_black_possible_moves:
-        if isinstance(move, list) and len(move) == 4:
-            current_x, current_y, new_x, new_y = move
-            if is_move_legal(chess_board, move, is_white_turn):
-                black_legal_moves.append(move)
-            else:
-                print("Invalid move", move)
+        current_x, current_y, new_x, new_y = move
+        if is_move_legal(chess_board, move, is_white_turn):
+            black_legal_moves.append(move)
 
     return black_legal_moves
 
@@ -980,7 +977,9 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
             temp_board = simulate_move(chess_board, move)
 
             game_state = is_check_mate(temp_board, is_white_turn)
+
             if game_state == 'Checkmate':
+                print("yeayea")
                 return move
 
             eval = minimax(temp_board, depth - 1, False, alpha, beta)
@@ -1005,7 +1004,6 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
 
             game_state = is_check_mate(temp_board, is_white_turn)
             if game_state == 'Checkmate':
-                print("ratatata")
                 return move
 
             eval = minimax(temp_board, depth - 1, True, alpha, beta)
