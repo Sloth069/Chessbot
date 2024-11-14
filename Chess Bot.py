@@ -21,11 +21,10 @@
 
 #      TODO:
 #       - use pygame to implement visual representation of the chessboard *
-#       - add a timer to see how long the program needs to make a move
+#       - add a timer to see how long the program needs to make a move *
 #       - add en passant
 #       - fix castling bug *
-#       - only allow pieces with legal moves to move, highlight legal moves
-#       - improve UI to only allow legal moves to be considered inputs
+#       - improve UI to only allow legal moves to be considered inputs and highlight legal moves
 #       - add promotion rule to pawns *
 #       - run tests to check for edge cases and make sure the logic is correct *
 #       - start working on move evaluation algorythm:
@@ -33,7 +32,7 @@
 #           2. weights for pieces *
 #           3. "heatmap" masks for each individual piece *
 #           4. implement checkmate into evaluation       *
-#           5. tempo/ zugzwang weighing
+#           5. tempo/ zugzwang weighing ( pointless / already covered in move simulation?)
 #           6. moving a piece should make consecutive moves with the same piece weigh less
 #           7. friendly pieces defending each other/ attacking same enemy position weigh more   // Prio
 #           8. pins on heavy pieces good
@@ -45,47 +44,71 @@
 #           4. procedural weight map changes according to turn count
 #           5. board hashing to prevent simulation for same board outcomes *
 #           6. magic bit board?
+#           7. precomputation // prio
 
+from itertools import chain
+import cProfile
+import pstats
+import random
+import time
 
 import pygame
-import random
+
+depth = 2
+
+player_is_white = False
+player_is_black = False
+ai_vs_ai = False
 
 empty_square = 0
 w_piece_dict = {1: 'w_pawn', 2: 'w_rook', 3: 'w_knight', 4: 'w_bishop', 5: 'w_queen', 6: 'w_king'}
 b_piece_dict = {7: 'b_pawn', 8: 'b_rook', 9: 'b_knight', 10: 'b_bishop', 11: 'b_queen', 12: 'b_king'}
-computed_moves = {}
+
+computed_moves_cache = {}
+
 w_king_pos = [7, 4]
 b_king_pos = [0, 4]
+
+precomputed_w_p_moves = {}
+precomputed_b_p_moves = {}
+precomputed_knight_moves = {}
+precomputed_horizontal_moves = {}
+precomputed_vertical_moves = {}
+precomputed_diagonal_moves = {}
+precomputed_king_moves = {}
+
 w_short_castle = False
 w_long_castle = False
 b_short_castle = False
 b_long_castle = False
+
 w_king_not_moved = True
 b_king_not_moved = True
 w_h_rook_not_moved = True
 w_a_rook_not_moved = True
 b_h_rook_not_moved = True
 b_a_rook_not_moved = True
+
 is_white_turn = True
 
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
-chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
+"""chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [7, 7, 7, 7, 7, 7, 7, 7],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [1, 1, 1, 1, 1, 1, 1, 1],
-               [2, 3, 4, 5, 6, 4, 3, 2]]
-"""chess_board = [[0, 0, 0, 0, 12, 0, 9, 0],
+               [2, 3, 4, 5, 6, 4, 3, 2]]"""
+chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
+               [0, 0, 0, 0, 0, 0, 0, 0],
+               [0, 0, 0, 0, 4, 0, 0, 0],
+               [0, 0, 0, 0, 0, 0, 3, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 6, 0, 0, 2]]"""
+               [0, 0, 0, 0, 6, 0, 0, 0]]
 
 # ------------------------------------------ Pygame Chessboard -------------------------------------------------------
 
@@ -147,10 +170,9 @@ def changing_turns():
 
 def generate_opponents_moves(chess_board, is_white_turn):
     if is_white_turn:
-
-        legal_moves = [move for moves in get_black_possible_moves(chess_board) for move in moves]
+        legal_moves = get_black_possible_moves(chess_board)
     else:
-        legal_moves = [move for moves in get_white_possible_moves(chess_board) for move in moves]
+        legal_moves = get_white_possible_moves(chess_board)
 
     return legal_moves
 
@@ -166,9 +188,12 @@ def is_king_in_check(temp_board, is_white_turn):
     # print(f"King position: {king_pos}")
     # print("Opponent's moves:", opponents_moves)
     for move in opponents_moves:
-        if move[2] == king_pos[0] and move[3] == king_pos[1]:
-            return True
-        # print(f"Checking move {move} against king position {king_pos}")
+        # Ensure move is a list or tuple with at least four elements
+        if isinstance(move, (list, tuple)) and len(move) >= 4:
+            if move[2] == king_pos[0] and move[3] == king_pos[1]:
+                return True
+        """else:
+            print(f"Unexpected move format: {move}")"""
 
     return False
 
@@ -177,14 +202,18 @@ def is_check_mate(chess_board, is_white_turn):
     if is_white_turn:
         if not get_black_legal_moves(chess_board, not is_white_turn):
             if is_king_in_check(chess_board, False):
-                return 'Checkmate'
+                forced_mate_eval = minimax(chess_board, depth, not is_white_turn, float('-inf'), float('inf'))
+                if forced_mate_eval == float('inf'):
+                    return 'Checkmate'
             else:
                 return 'Stalemate'
 
     else:
         if not get_white_legal_moves(chess_board, not is_white_turn):
             if is_king_in_check(chess_board, True):
-                return 'Checkmate'
+                forced_mate_eval = minimax(chess_board, depth, not is_white_turn, float('-inf'), float('inf'))
+                if forced_mate_eval == float('-inf'):
+                    return 'Checkmate'
             else:
                 return 'Stalemate'
 
@@ -192,6 +221,9 @@ def is_check_mate(chess_board, is_white_turn):
 
 
 def simulate_move(chess_board, move):
+    if not (isinstance(move, (list, tuple)) and len(move) == 4):
+        print(f"Unexpected move format in simulate_move: {move}")
+        return chess_board  # Return board unmodified if move format is wrong
     # Create a deep copy of the board
     temp_board = [row[:] for row in chess_board]
 
@@ -328,30 +360,42 @@ def get_white_possible_moves(chess_board):
             piece = chess_board[x][y]
 
             if piece == 1:
-                white_possible_moves.append(white_pawn_movement(chess_board, x, y))
+                moves = white_pawn_movement(chess_board, x, y)
             elif piece == 2:
-                white_possible_moves.append(white_horizontal_movement(chess_board, x, y))
-                white_possible_moves.append(white_vertical_movement(chess_board, x, y))
+                moves = (white_horizontal_movement(chess_board, x, y) +
+                         white_vertical_movement(chess_board, x, y))
             elif piece == 3:
-                white_possible_moves.append(white_knight_movement(chess_board, x, y))
+                moves = white_knight_movement(chess_board, x, y)
+
             elif piece == 4:
-                white_possible_moves.append(white_diagonal_movement(chess_board, x, y))
+                moves = white_diagonal_movement(chess_board, x, y)
+
             elif piece == 5:
-                white_possible_moves.append(white_horizontal_movement(chess_board, x, y))
-                white_possible_moves.append(white_vertical_movement(chess_board, x, y))
-                white_possible_moves.append(white_diagonal_movement(chess_board, x, y))
+                moves = (white_horizontal_movement(chess_board, x, y) +
+
+                         white_vertical_movement(chess_board, x, y) +
+
+                         white_diagonal_movement(chess_board, x, y))
+
             elif piece == 6:
-                white_possible_moves.append(white_king_movement(chess_board, x, y))
+                moves = white_king_movement(chess_board, x, y)
+            else:
+                moves = []
+
+            if all(isinstance(m, list) and len(m) == 4 for m in moves):
+                white_possible_moves.extend(moves)
+            else:
+                print(f"Unexpected move format in {piece} movement at {(x, y)}: {moves}")
 
     return white_possible_moves
 
 
 def get_white_legal_moves(chess_board, is_white_turn):
     white_legal_moves = []
-    flattened_white_possible_moves = get_white_possible_moves(chess_board)
-    flattened_white_possible_moves = [t for xs in flattened_white_possible_moves for t in xs]
+    white_flattened_possible_moves = get_white_possible_moves(chess_board)
+    white_flattened_possible_moves = [move for moves in [white_flattened_possible_moves] for move in moves]
 
-    for move in flattened_white_possible_moves:
+    for move in white_flattened_possible_moves:
         start_x, start_y, new_x, new_y = move
         if is_move_legal(chess_board, move, is_white_turn):
             white_legal_moves.append(move)
@@ -366,20 +410,27 @@ def get_black_possible_moves(chess_board):
             piece = chess_board[x][y]
 
             if piece == 7:
-                black_possible_moves.append(black_pawn_movement(chess_board, x, y))
+                moves = black_pawn_movement(chess_board, x, y)
             elif piece == 8:
-                black_possible_moves.append(black_horizontal_movement(chess_board, x, y))
-                black_possible_moves.append(black_vertical_movement(chess_board, x, y))
+                moves = (black_horizontal_movement(chess_board, x, y) +
+                         black_vertical_movement(chess_board, x, y))
             elif piece == 9:
-                black_possible_moves.append(black_knight_movement(chess_board, x, y))
+                moves = black_knight_movement(chess_board, x, y)
             elif piece == 10:
-                black_possible_moves.append(black_diagonal_movement(chess_board, x, y))
+                moves = black_diagonal_movement(chess_board, x, y)
             elif piece == 11:
-                black_possible_moves.append(black_horizontal_movement(chess_board, x, y))
-                black_possible_moves.append(black_vertical_movement(chess_board, x, y))
-                black_possible_moves.append(black_diagonal_movement(chess_board, x, y))
+                moves = (black_horizontal_movement(chess_board, x, y) +
+                         black_vertical_movement(chess_board, x, y) +
+                         black_diagonal_movement(chess_board, x, y))
             elif piece == 12:
-                black_possible_moves.append(black_king_movement(chess_board, x, y))
+                moves = black_king_movement(chess_board, x, y)
+            else:
+                moves = []
+
+            if all(isinstance(m, list) and len(m) == 4 for m in moves):
+                black_possible_moves.extend(moves)
+            else:
+                print(f"Unexpected move format in {piece} movement at {(x, y)}: {moves}")
 
     return black_possible_moves
 
@@ -387,10 +438,9 @@ def get_black_possible_moves(chess_board):
 def get_black_legal_moves(chess_board, is_white_turn):
     black_legal_moves = []
     flattened_black_possible_moves = get_black_possible_moves(chess_board)
-    flattened_black_possible_moves = [t for xs in flattened_black_possible_moves for t in xs]
+    flattened_black_possible_moves = [t for xs in [flattened_black_possible_moves] for t in xs]
 
     for move in flattened_black_possible_moves:
-        current_x, current_y, new_x, new_y = move
         if is_move_legal(chess_board, move, is_white_turn):
             black_legal_moves.append(move)
 
@@ -400,301 +450,362 @@ def get_black_legal_moves(chess_board, is_white_turn):
 # ---------------------------------- 4. Define different movement functions ------------------------------
 
 
+def precompute_white_pawn_moves():
+    for x in range(8):
+        for y in range(8):
+            moves = []
+
+            if x > 0:
+                moves.append((x - 1, y))
+            if x == 6:
+                moves.append((x - 2, y))
+            if x > 0 and y < 7:
+                moves.append((x - 1, y + 1))
+            if x > 0 and y > 0:
+                moves.append((x - 1, y - 1))
+
+            precomputed_w_p_moves[(x, y)] = moves
+
+
 def white_pawn_movement(chess_board, x, y):
     white_pawn_moves = []
+    precomputed_moves = precomputed_w_p_moves[(x, y)]
 
-    if x > 0:
-        # moving forward if space ahead is empty
-        if chess_board[x - 1][y] == 0:
-            white_pawn_moves.append([x, y, x - 1, y])
-        # capturing the piece diagonally right
-        if y < 7 and x > 0 and 6 < chess_board[x - 1][y + 1] < 13:
-            white_pawn_moves.append([x, y, x - 1, y + 1])
-        # Capturing the piece diagonally left
-        if y > 0 and x > 0 and 6 < chess_board[x - 1][y - 1] < 13:
-            white_pawn_moves.append([x, y, x - 1, y - 1])
-        # moving forward 2 spaces if in original position and both are empty
-        if x == 6 and chess_board[x - 1][y] == 0 and chess_board[x - 2][y] == 0:
-            white_pawn_moves.append([x, y, x - 2, y])
+    white_pawn_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if new_y == y and 8 > new_x >= 0 == chess_board[new_x][new_y]
+           and not (x == 6 and new_x == x - 2 and chess_board[x - 1][y] != 0)
+    ])
+
+    white_pawn_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if abs(new_y - y) == 1 and 0 <= new_x < 8 and 0 <= new_y < 8
+           and 6 < chess_board[new_x][new_y] < 13
+    ])
 
     return white_pawn_moves
 
 
+def precompute_black_pawn_moves():
+    for x in range(8):
+        for y in range(8):
+            moves = []
+
+            if x > 0:
+                moves.append((x + 1, y))
+            if x == 1:
+                moves.append((x + 2, y))
+            if x > 0 and y < 7:
+                moves.append((x + 1, y + 1))
+            if x > 0 and y > 0:
+                moves.append((x + 1, y - 1))
+
+            precomputed_b_p_moves[(x, y)] = moves
+
+
 def black_pawn_movement(chess_board, x, y):
     black_pawn_moves = []
+    precomputed_moves = precomputed_b_p_moves[(x, y)]
 
-    if x < 7:
-        # moving forward if space ahead is empty
-        if chess_board[x + 1][y] == 0:
-            black_pawn_moves.append([x, y, x + 1, y])
-        # capturing the piece diagonally right
-        if y < 7 and x < 7 and 0 < chess_board[x + 1][y + 1] < 7:
-            black_pawn_moves.append([x, y, x + 1, y + 1])
-        # Capturing the piece diagonally left
-        if y > 0 and x < 7 and 0 < chess_board[x + 1][y - 1] < 7:
-            black_pawn_moves.append([x, y, x + 1, y - 1])
-        # moving forward 2 spaces if in original position and both are empty
-        if x == 1 and chess_board[x + 1][y] == 0 and chess_board[x + 2][y] == 0:
-            black_pawn_moves.append([x, y, x + 2, y])
+    black_pawn_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if new_y == y and 8 > new_x >= 0 == chess_board[new_x][new_y]
+           and not (x == 1 and new_x == x + 2 and chess_board[x + 1][y] != 0)
+    ])
 
+    black_pawn_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if abs(new_y - y) == 1 and 0 <= new_x < 8 and 0 <= new_y < 8
+           and 0 < chess_board[new_x][new_y] < 7
+    ])
     return black_pawn_moves
+
+
+def precompute_knight_moves():
+    for x in range(8):
+        for y in range(8):
+            moves = []
+            knight_moves = ((1, 2), (1, -2), (-1, 2), (-1, -2), (2, 1), (2, -1), (-2, 1), (-2, -1))
+
+            for (j, k) in knight_moves:
+                if 7 >= x + j >= 0 and 7 >= y + k >= 0:
+                    if chess_board[x + j][y + k] == 0:
+                        moves.append((x + j, y + k))
+
+            precomputed_knight_moves[(x, y)] = moves
 
 
 def white_knight_movement(chess_board, x, y):
     white_knight_moves = []
+    precomputed_moves = precomputed_knight_moves[(x, y)]
 
-    knight_moves = ((1, 2), (-1, 2), (1, -2), (-1, -2), (2, 1), (-2, 1), (2, -1), (-2, -1))
-    for (j, k) in knight_moves:
-        if 7 >= x + j >= 0 and 7 >= y + k >= 0:
-            if chess_board[x + j][y + k] == 0:
-                white_knight_moves.append([x, y, x + j, y + k])
-            elif 6 < chess_board[x + j][y + k] < 13:
-                white_knight_moves.append([x, y, x + j, y + k])
+    white_knight_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if chess_board[x][y] == 0
+        if 6 < chess_board[new_x][new_y] < 13
+    ])
 
     return white_knight_moves
 
 
 def black_knight_movement(chess_board, x, y):
     black_knight_moves = []
+    precomputed_moves = precomputed_knight_moves[(x, y)]
 
-    knight_moves = ((1, 2), (-1, 2), (1, -2), (-1, -2), (2, 1), (-2, 1), (2, -1), (-2, -1))
-    for (j, k) in knight_moves:
-        if 7 >= x + j >= 0 and 7 >= y + k >= 0:
-            if chess_board[x + j][y + k] == 0:
-                black_knight_moves.append([x, y, x + j, y + k])
-            elif 0 < chess_board[x + j][y + k] < 7:
-                black_knight_moves.append([x, y, x + j, y + k])
+    black_knight_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if chess_board[x][y] == 0
+        if 0 < chess_board[new_x][new_y] < 7
+    ])
 
     return black_knight_moves
 
 
+def generate_white_directional_moves(chess_board, x, y, direction_moves):
+    for new_x, new_y in direction_moves:
+        if chess_board[new_x][new_y] == 0:
+            yield [x, y, new_x, new_y]
+        elif 6 < chess_board[new_x][new_y] < 13:
+            yield [x, y, new_x, new_y]
+            break
+        else:
+            break
+
+
+def generate_black_directional_moves(chess_board, x, y,direction_moves):
+    for new_x, new_y in direction_moves:
+        if chess_board[new_x][new_y] == 0:
+            yield [x, y, new_x, new_y]
+        elif 0 < chess_board[new_x][new_y] < 7:
+            yield [x, y, new_x, new_y]
+            break
+        else:
+            break
+
+
+def precompute_horizontal_moves():
+    for x in range(8):
+        for y in range(8):
+            moves = {"right": [], "left": []}
+
+            for j in range(1, 8 - y):
+                moves["right"].append([x, y + j])
+            for k in range(1, y + 1):
+                moves["left"].append([x, y - k])
+
+            precomputed_horizontal_moves[(x, y)] = moves
+
+
 def white_horizontal_movement(chess_board, x, y):
     white_horizontal_moves = []
+    precomputed_moves = precomputed_horizontal_moves[(x, y)]
 
-    # horizontal movement to the right:
-    for j in range(1, 8 - y):
-        new_y = y + j
-        if 0 <= new_y < 8:
-            # checking for empty squares:
-            if chess_board[x][new_y] == 0:
-                white_horizontal_moves.append(([x, y, x, new_y]))
-            # checking for squares with opposing pieces:
-            elif 6 < chess_board[x][new_y] < 13:
-                white_horizontal_moves.append(([x, y, x, new_y]))
-                break
-            # breaking the function when the only option is for a friendly piece to be ahead
-            else:
-                break
-
-    # horizontal movement to the left:
-    for k in range(1, y + 1):
-        new_y = y - k
-        if 0 <= new_y < 8:
-            if chess_board[x][new_y] == 0:
-                white_horizontal_moves.append(([x, y, x, new_y]))
-            elif 6 < chess_board[x][new_y] < 13:
-                white_horizontal_moves.append(([x, y, x, new_y]))
-                break
-            else:
-                break
+    white_horizontal_moves.extend(
+        chain(
+            generate_white_directional_moves(chess_board, x, y, precomputed_moves["right"]),
+            generate_white_directional_moves(chess_board, x, y, precomputed_moves["left"])
+        )
+    )
 
     return white_horizontal_moves
 
 
 def black_horizontal_movement(chess_board, x, y):
     black_horizontal_moves = []
-    # horizontal movement to the right:
-    for j in range(1, 8 - y):
-        new_y = y + j
-        if 0 <= new_y < 8:
-            # checking for empty squares:
-            if chess_board[x][new_y] == 0:
-                black_horizontal_moves.append([x, y, x, new_y])
-            # checking for squares with opposing pieces:
-            elif 0 < chess_board[x][new_y] < 7:
-                black_horizontal_moves.append([x, y, x, new_y])
-                break
-            # breaking the function when the only option is for a friendly piece to be ahead
-            else:
-                break
+    precomputed_moves = precomputed_horizontal_moves[(x, y)]
 
-    # horizontal movement to the left:
-    for k in range(1, y + 1):
-        new_y = y - k
-        if 0 <= new_y < 8:
-            if chess_board[x][new_y] == 0:
-                black_horizontal_moves.append([x, y, x, new_y])
-            elif 0 < chess_board[x][new_y] < 7:
-                black_horizontal_moves.append([x, y, x, new_y])
-                break
-            else:
-                break
-
+    black_horizontal_moves.extend(
+        chain(
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["right"]),
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["left"])
+        )
+    )
     return black_horizontal_moves
+
+
+def precompute_vertical_moves():
+    for x in range(8):
+        for y in range(8):
+            moves = {"up": [], "down": []}
+
+            # Generate "up" moves within bounds
+            for i in range(x - 1, -1, -1):
+                moves["up"].append([i, y])
+
+            # Generate "down" moves within bounds
+            for i in range(x + 1, 8):
+                moves["down"].append([i, y])
+
+            precomputed_vertical_moves[(x, y)] = moves
 
 
 def white_vertical_movement(chess_board, x, y):
     white_vertical_moves = []
+    precomputed_moves = precomputed_vertical_moves[(x, y)]
 
-    for j in range(1, 8 - x):
-        new_x = x + j
-        if 0 <= new_x < 8:
-            if chess_board[new_x][y] == 0:
-                white_vertical_moves.append([x, y, new_x, y])
-            elif 6 < chess_board[new_x][y] < 13:
-                white_vertical_moves.append([x, y, new_x, y])
-                break
-            else:
-                break
-    for k in range(1, x + 1):
-        new_x = x - k
-        if 0 <= new_x < 8:
-            if chess_board[new_x][y] == 0:
-                white_vertical_moves.append([x, y, new_x, y])
-            elif 6 < chess_board[new_x][y] < 13:
-                white_vertical_moves.append([x, y, new_x, y])
-                break
-            else:
-                break
+    for new_x, new_y in precomputed_moves["down"]:
+        if chess_board[new_x][new_y] == 0:
+            white_vertical_moves.append([x, y, new_x, new_y])
+        elif 6 < chess_board[new_x][new_y] < 13:
+            white_vertical_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
+
+    for new_x, new_y in precomputed_moves["up"]:
+        if chess_board[new_x][new_y] == 0:
+            white_vertical_moves.append([x, y, new_x, new_y])
+        elif 6 < chess_board[new_x][new_y] < 13:
+            white_vertical_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
 
     return white_vertical_moves
 
 
-# vertical movement function for white queen, rook
-
-
 def black_vertical_movement(chess_board, x, y):
     black_vertical_moves = []
+    precomputed_moves = precomputed_vertical_moves[(x, y)]
 
-    for j in range(1, 8 - x):
-        new_x = x + j
-        if 0 <= new_x < 8:
-            if chess_board[new_x][y] == 0:
-                black_vertical_moves.append([x, y, new_x, y])
-            elif 0 < chess_board[new_x][y] < 7:
-                black_vertical_moves.append([x, y, new_x, y])
-                break
-            else:
-                break
-    for k in range(1, x + 1):
-        new_x = x - k
-        if 0 <= new_x < 8:
-            if chess_board[new_x][y] == 0:
-                black_vertical_moves.append([x, y, new_x, y])
-            elif 0 < chess_board[new_x][y] < 7:
-                black_vertical_moves.append([x, y, new_x, y])
-                break
-            else:
-                break
+    for new_x, new_y in precomputed_moves["down"]:
+        if chess_board[new_x][new_y] == 0:
+            black_vertical_moves.append([x, y, new_x, new_y])
+        elif 0 < chess_board[new_x][new_y] < 7:
+            black_vertical_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
+
+    for new_x, new_y in precomputed_moves["up"]:
+        if chess_board[new_x][new_y] == 0:
+            black_vertical_moves.append([x, y, new_x, new_y])
+        elif 0 < chess_board[new_x][new_y] < 7:
+            black_vertical_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
 
     return black_vertical_moves
 
 
-# vertical movement function for black queen, rook
+def precompute_diagonal_moves():
+    global precomputed_diagonal_moves
+
+    for x in range(8):
+        for y in range(8):
+            moves = {"up_left": [], "up_right": [], "down_left": [], "down_right": []}
+
+            for j in range(1, min(x, y) + 1):
+                new_x, new_y = x - j, y - j
+                if 0 <= new_x < 8 and 0 <= new_y < 8:
+                    moves["up_left"].append([new_x, new_y])
+                else:
+                    break
+            for j in range(1, min(x, 7 - y) + 1):
+                new_x, new_y = x - j, y + j
+                if 0 <= new_x < 8 and 0 <= new_y < 8:
+                    moves["up_right"].append([new_x, new_y])
+                else:
+                    break
+            for j in range(1, min(7 - x, y) + 1):
+                new_x, new_y = x + j, y - j
+                if 0 <= new_x < 8 and 0 <= new_y < 8:
+                    moves["down_left"].append([new_x, new_y])
+                else:
+                    break
+            for j in range(1, min(7 - x, 7 - y) + 1):
+                new_x, new_y = x + j, y + j
+                if 0 <= new_x < 8 and 0 <= new_y < 8:
+                    moves["down_right"].append([new_x, new_y])
+                else:
+                    break
+
+            precomputed_diagonal_moves[(x, y)] = moves
 
 
 def white_diagonal_movement(chess_board, x, y):
     white_diagonal_moves = []
+    precomputed_moves = precomputed_diagonal_moves[(x, y)]
 
-    # diagonal movement to the top left(-x, -y)
-    for j in range(1, 8):
-        new_x, new_y = x - j, y - j
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                white_diagonal_moves.append([x, y, new_x, new_y])
-            elif 6 < chess_board[new_x][new_y] < 13:
-                white_diagonal_moves.append([x, y, new_x, new_y])
-                break
-            else:
-                break
-    # diagonal movement to the top right(-x, +y)
-    for k in range(1, 8):
-        new_x, new_y = x - k, y + k
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                white_diagonal_moves.append([x, y, new_x, new_y])
-            elif 6 < chess_board[new_x][new_y] < 13:
-                white_diagonal_moves.append([x, y, new_x, new_y])
-                break
-            else:
-                break
-    # diagonal movement to the bottom right( +x, +y)
-    for m in range(1, 8):
-        new_x, new_y = x + m, y + m
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                white_diagonal_moves.append([x, y, new_x, new_y])
-            elif 6 < chess_board[new_x][new_y] < 13:
-                white_diagonal_moves.append([x, y, new_x, new_y])
-                break
-            else:
-                break
-    # diagonal movement to the bottom left( +x, -y)
-    for n in range(1, 8):
-        new_x, new_y = x + n, y - n
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                white_diagonal_moves.append([x, y, new_x, new_y])
-            elif 6 < chess_board[new_x][new_y] < 13:
-                white_diagonal_moves.append([x, y, new_x, new_y])
-                break
-            else:
-                break
+    for new_x, new_y in precomputed_moves["up_left"]:
+        if chess_board[new_x][new_y] == 0:
+            white_diagonal_moves.append([x, y, new_x, new_y])
+        elif 6 < chess_board[new_x][new_y] < 13:
+            white_diagonal_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
+    for new_x, new_y in precomputed_moves["up_right"]:
+        if chess_board[new_x][new_y] == 0:
+            white_diagonal_moves.append([x, y, new_x, new_y])
+        elif 6 < chess_board[new_x][new_y] < 13:
+            white_diagonal_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
+    for new_x, new_y in precomputed_moves["down_left"]:
+        if chess_board[new_x][new_y] == 0:
+            white_diagonal_moves.append([x, y, new_x, new_y])
+        elif 6 < chess_board[new_x][new_y] < 13:
+            white_diagonal_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
+    for new_x, new_y in precomputed_moves["down_right"]:
+        if chess_board[new_x][new_y] == 0:
+            white_diagonal_moves.append([x, y, new_x, new_y])
+        elif 6 < chess_board[new_x][new_y] < 13:
+            white_diagonal_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
 
     return white_diagonal_moves
 
 
 def black_diagonal_movement(chess_board, x, y):
     black_diagonal_moves = []
+    precomputed_moves = precomputed_diagonal_moves[(x, y)]
 
-    # diagonal movement to the top left(-x, -y)
-    for j in range(1, 8):
-        new_x, new_y = x - j, y - j  # moving x up and y left
-        if 0 <= new_x < 8 and 0 <= new_y < 8:  # checking that x and y are within the chessboard
-            # print(f"Checking position: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
-            if chess_board[new_x][new_y] == 0:  # checking for an empty square
-                black_diagonal_moves.append([x, y, new_x, new_y])
-                # print(f"Empty square: {new_x}, {new_y} -> {chess_board[new_x][new_y]}")
-            elif 0 < chess_board[new_x][new_y] < 7:  # checking for a white piece to take
-                black_diagonal_moves.append([x, y, new_x, new_y])
-                # print(f"Captured at: {new_x}, {new_y}")
-                break  # breaking after taking the piece
-            else:  # last possibility is a friendly piece, so the function breaks
-                # print(f"Friendly piece at: {new_x}, {new_y}")
-                break
-    # diagonal movement to the top right(-x, +y)
-    for k in range(1, 8):
-        new_x, new_y = x - k, y + k
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                black_diagonal_moves.append([x, y, new_x, new_y])
-            elif 0 < chess_board[new_x][new_y] < 7:
-                black_diagonal_moves.append([x, y, new_x, new_y])
-                break
-            else:
-                break
-    # diagonal movement to the bottom right( +x, +y)
-    for m in range(1, 8):
-        new_x, new_y = x + m, y + m
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                black_diagonal_moves.append([x, y, new_x, new_y])
-            elif 0 < chess_board[new_x][new_y] < 7:
-                black_diagonal_moves.append([x, y, new_x, new_y])
-                break
-            else:
-                break
-    # diagonal movement to the bottom left( +x, -y)
-    for n in range(1, 8):
-        new_x, new_y = x + n, y - n
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                black_diagonal_moves.append([x, y, new_x, new_y])
-            elif 0 < chess_board[new_x][new_y] < 7:
-                black_diagonal_moves.append([x, y, new_x, new_y])
-                break
-            else:
-                break
+    for new_x, new_y in precomputed_moves["up_left"]:
+        if chess_board[new_x][new_y] == 0:
+            black_diagonal_moves.append([x, y, new_x, new_y])
+        elif 0 < chess_board[new_x][new_y] < 7:
+            black_diagonal_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
+    for new_x, new_y in precomputed_moves["up_right"]:
+        if chess_board[new_x][new_y] == 0:
+            black_diagonal_moves.append([x, y, new_x, new_y])
+        elif 0 < chess_board[new_x][new_y] < 7:
+            black_diagonal_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
+    for new_x, new_y in precomputed_moves["down_left"]:
+        if chess_board[new_x][new_y] == 0:
+            black_diagonal_moves.append([x, y, new_x, new_y])
+        elif 0 < chess_board[new_x][new_y] < 7:
+            black_diagonal_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
+    for new_x, new_y in precomputed_moves["down_right"]:
+        if chess_board[new_x][new_y] == 0:
+            black_diagonal_moves.append([x, y, new_x, new_y])
+        elif 0 < chess_board[new_x][new_y] < 7:
+            black_diagonal_moves.append([x, y, new_x, new_y])
+            break
+        else:
+            break
 
     return black_diagonal_moves
 
@@ -702,7 +813,7 @@ def black_diagonal_movement(chess_board, x, y):
 def white_king_movement(chess_board, x, y):
     white_king_moves = []
 
-    king_moves = ((1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1))
+    king_moves = [(1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1)]
 
     for (j, k) in king_moves:
         new_x, new_y = x + j, y + k
@@ -713,9 +824,8 @@ def white_king_movement(chess_board, x, y):
                 temp_board = simulate_move(chess_board, [x, y, new_x, new_y])
                 if not is_king_in_check(temp_board, True):
                     white_king_moves.append([x, y, new_x, new_y])
-                    break
                 else:
-                    break
+                    continue
 
     return white_king_moves
 
@@ -752,7 +862,7 @@ def long_castling_white(chess_board, king_x, king_y):
 
 def black_king_movement(chess_board, x, y):
     black_king_moves = []
-    king_moves = ((1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1))
+    king_moves = [(1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1)]
 
     for (j, k) in king_moves:
         new_x, new_y = x + j, y + k
@@ -765,9 +875,8 @@ def black_king_movement(chess_board, x, y):
                     print(temp_board[i])"""
                 if not is_king_in_check(temp_board, False):
                     black_king_moves.append([x, y, new_x, new_y])
-                    break
                 else:
-                    break
+                    continue
 
     return black_king_moves
 
@@ -777,11 +886,11 @@ def short_castling_black(chess_board, king_x, king_y):
     filtered_moves = [move for moves in w_possible_moves for move in moves]
     castle_squares = [[0, 4], [0, 5], [0, 6]]
 
-    if chess_board[7][5] == 0 and chess_board[7][6] == 0:
+    if chess_board[0][5] == 0 and chess_board[0][6] == 0:
         if all(square not in [[move[2], move[3]] for move in filtered_moves] for square in castle_squares):
-            if w_king_not_moved:
-                if chess_board[7][7] == 8:
-                    if w_h_rook_not_moved:
+            if b_king_not_moved:
+                if chess_board[0][7] == 8:
+                    if b_h_rook_not_moved:
                         return True
 
     return False
@@ -793,9 +902,9 @@ def long_castling_black(chess_board, king_x, king_y):
     castle_squares = [[0, 4], [0, 3], [0, 2]]
     if chess_board[0][1] == 0 and chess_board[0][2] == 0 and chess_board[0][3] == 0:
         if all(square not in [[move[2], move[3]] for move in filtered_moves] for square in castle_squares):
-            if w_king_not_moved:
+            if b_king_not_moved:
                 if chess_board[0][0] == 8:
-                    if w_a_rook_not_moved:
+                    if b_a_rook_not_moved:
                         return True
 
     return False
@@ -827,9 +936,9 @@ def get_board_key(chess_board, is_white_turn):
 
 def minimax(chess_board, depth, is_white_turn, alpha, beta, cache=None):
     if cache is None:
-        cache = computed_moves
-    board_key = get_board_key(chess_board, is_white_turn)
-    if board_key in computed_moves:
+        cache = computed_moves_cache
+    board_key = (get_board_key(chess_board, is_white_turn), depth)
+    if board_key in computed_moves_cache:
         return cache[board_key]
 
     if depth == 0:
@@ -1000,9 +1109,13 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
     if is_white_turn:
         max_eval = float('-inf')
         white_legal_moves = get_white_legal_moves(chess_board, is_white_turn)
-        if w_short_castle == True:
-           white_legal_moves.append([7, 4, 7, 6])
-        if w_long_castle == True:
+        king_x, king_y = find_king(chess_board, 6)
+        w_short_castle = short_castling_white(chess_board, king_x, king_y)
+        w_long_castle = long_castling_white(chess_board, king_x, king_y)
+
+        if w_short_castle:
+            white_legal_moves.append([7, 4, 7, 6])
+        if w_long_castle:
             white_legal_moves.append([7, 4, 7, 2])
 
         capture_moves, check_moves, other_moves = prioritize_moves(white_legal_moves, chess_board)
@@ -1011,7 +1124,9 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
         for move in check_moves:
             temp_board = simulate_move(chess_board, move)
             if is_check_mate(temp_board, is_white_turn):
-                return move
+                forced_mate_eval = minimax(temp_board, 3, not is_white_turn, alpha, beta)
+                if forced_mate_eval == float('inf'):
+                    return move
 
             eval = minimax(temp_board, depth - 1, not is_white_turn, alpha, beta)
 
@@ -1052,9 +1167,13 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
     else:
         min_eval = float('inf')
         black_legal_moves = get_black_legal_moves(chess_board, is_white_turn)
-        if b_short_castle == True:
+        king_x, king_y = find_king(chess_board, 12)
+        b_short_castle = short_castling_black(chess_board, king_x, king_y)
+        b_long_castle = long_castling_black(chess_board, king_x, king_y)
+
+        if b_short_castle:
             black_legal_moves.append([0, 4, 0, 6])
-        if b_long_castle == True:
+        if b_long_castle:
             black_legal_moves.append([0, 4, 0, 2])
 
         capture_moves, check_moves, other_moves = prioritize_moves(black_legal_moves, chess_board)
@@ -1063,7 +1182,9 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
         for move in check_moves:
             temp_board = simulate_move(chess_board, move)
             if is_check_mate(temp_board, is_white_turn):
-                return move
+                forced_mate_eval = minimax(temp_board, 3, not is_white_turn, alpha, beta)
+                if forced_mate_eval == float('-inf'):
+                    return move
 
             eval = minimax(temp_board, depth - 1, not is_white_turn, alpha, beta)
 
@@ -1102,8 +1223,9 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
                 break
 
     if top_moves:
+        print("roar", top_moves)
         best_move = random.choice(top_moves)
-    """else:
+    else:
         if is_white_turn:
             moves = get_white_legal_moves(chess_board, True)
             if moves:
@@ -1111,7 +1233,7 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
         else:
             moves = get_black_legal_moves(chess_board, False)
             if moves:
-                best_move = random.choice(moves)"""
+                best_move = random.choice(moves)
 
     return best_move
 
@@ -1144,7 +1266,7 @@ def get_player_move():
                     # Return both starting and target positions
                     return selected_square[0], selected_square[1], to_square[0], to_square[1]
 
-        pygame.display.flip()
+            pygame.display.flip()
 
 
 def game_loop(screen, chess_board, depth):
@@ -1158,10 +1280,8 @@ def game_loop(screen, chess_board, depth):
         pygame.display.flip()
 
         if is_white_turn:
+            start_time = time.perf_counter()
             print(" Its Whites turn!")
-            king_x, king_y = find_king(chess_board, 6)
-            w_short_castle = short_castling_white(chess_board, king_x, king_y)
-            w_long_castle = long_castling_white(chess_board, king_x, king_y)
             if is_king_in_check(chess_board, is_white_turn):
                 print(" White king is in check")
             if player_is_white:
@@ -1206,16 +1326,18 @@ def game_loop(screen, chess_board, depth):
                     break
 
             print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
-            computed_moves.clear()
+            computed_moves_cache.clear()
+            end_time = time.perf_counter()
+            calc_time = end_time - start_time
+            print(f"Move found after {calc_time:.4f} seconds")
             changing_turns()
 
         else:
+            start_time = time.perf_counter()
             print(" It´s Blacks turn!")
             king_x, king_y = find_king(chess_board, 12)
             if is_king_in_check(chess_board, is_white_turn):
                 print(" Black king is in check")
-            b_short_castle = short_castling_black(chess_board, king_x, king_y)
-            b_long_castle = long_castling_black(chess_board, king_x, king_y)
             if player_is_black:
                 black_choice = get_player_move()
                 if black_choice:
@@ -1255,23 +1377,24 @@ def game_loop(screen, chess_board, depth):
                     break
 
             print(" Current state of the board:", evaluate_board_state(chess_board, is_white_turn))
-            computed_moves.clear()
+            computed_moves_cache.clear()
+            end_time = time.perf_counter()
+            calc_time = end_time - start_time
+            print(f"Move found after {calc_time:.4f} seconds")
             changing_turns()
 
     pygame.quit()
 
 
-if __name__ == '__main__':
+def start_game():
     print("Choose game mode:")
     print("1. Play as White")
     print("2. Play as Black")
     print("3. AI vs AI")
     # print("4. Player vs Player")
-
-    player_is_white = False
-    player_is_black = False
-    ai_vs_ai = False
-
+    global player_is_white
+    global player_is_black
+    global ai_vs_ai
     game_mode = input("Enter 1, 2, 3: ")
 
     if game_mode not in ['1', '2', '3']:
@@ -1284,6 +1407,18 @@ if __name__ == '__main__':
     if game_mode == '3':
         ai_vs_ai = True
 
+    precompute_white_pawn_moves()
+    precompute_black_pawn_moves()
+    precompute_knight_moves()
+    precompute_horizontal_moves()
+    precompute_vertical_moves()
+    precompute_diagonal_moves()
+    # precompute_king_moves()
+
+    game_loop(screen, chess_board, depth)
+
+
+if __name__ == '__main__':
     pygame.init()
 
     width = 800
@@ -1295,7 +1430,11 @@ if __name__ == '__main__':
     screen.fill(pygame.Color("white"))
     pygame.time.Clock().tick(10)
 
-    depth = 4
+    profiler = cProfile.Profile()
+    profiler.enable()
 
-    game_loop(screen, chess_board, depth)
+    start_game()
 
+    profiler.disable()
+    stats = pstats.Stats(profiler).sort_stats('ncalls')
+    stats.print_stats()
