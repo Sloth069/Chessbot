@@ -37,14 +37,16 @@
 #           7. friendly pieces defending each other/ attacking same enemy position weigh more   // Prio
 #           8. pins on heavy pieces good
 #           9. trade pieces when ahead to simplify position
-#          10. calculate checks deeper into possible checkmates         // Prio
+#          10. calculate checks deeper into possible checkmates       *
 #       - ideas to make calculation more efficient:
 #           1. alpha beta pruning *
 #           3. prioritize checks/heavy pieces/positions on the board *
 #           4. procedural weight map changes according to turn count
 #           5. board hashing to prevent simulation for same board outcomes *
 #           6. magic bit board?
-#           7. precomputation // prio
+#           7. pre computation *
+#           8. heuristic pruning // prio
+#           9. multithreading / parallel threading to find moves and evaluate simultaneously
 
 from itertools import chain
 import cProfile
@@ -54,7 +56,7 @@ import time
 
 import pygame
 
-depth = 2
+depth = 4
 
 player_is_white = False
 player_is_black = False
@@ -93,22 +95,22 @@ is_white_turn = True
 
 # ------------------------------------------ 1. Create array representing chess board --------------------------------
 
-"""chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
+chess_board = [[8, 9, 10, 11, 12, 10, 9, 8],
                [7, 7, 7, 7, 7, 7, 7, 7],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [1, 1, 1, 1, 1, 1, 1, 1],
-               [2, 3, 4, 5, 6, 4, 3, 2]]"""
-chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
+               [2, 3, 4, 5, 6, 4, 3, 2]]
+"""chess_board = [[0, 0, 0, 0, 12, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 4, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 3, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
                [0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 6, 0, 0, 0]]
+               [0, 0, 0, 0, 6, 0, 0, 0]]"""
 
 # ------------------------------------------ Pygame Chessboard -------------------------------------------------------
 
@@ -185,8 +187,7 @@ def is_king_in_check(temp_board, is_white_turn):
         return True
 
     opponents_moves = generate_opponents_moves(temp_board, is_white_turn)
-    # print(f"King position: {king_pos}")
-    # print("Opponent's moves:", opponents_moves)
+
     for move in opponents_moves:
         # Ensure move is a list or tuple with at least four elements
         if isinstance(move, (list, tuple)) and len(move) >= 4:
@@ -475,14 +476,14 @@ def white_pawn_movement(chess_board, x, y):
         [x, y, new_x, new_y]
         for new_x, new_y in precomputed_moves
         if new_y == y and 8 > new_x >= 0 == chess_board[new_x][new_y]
-           and not (x == 6 and new_x == x - 2 and chess_board[x - 1][y] != 0)
+        and not (x == 6 and new_x == x - 2 and chess_board[x - 1][y] != 0)
     ])
 
     white_pawn_moves.extend([
         [x, y, new_x, new_y]
         for new_x, new_y in precomputed_moves
         if abs(new_y - y) == 1 and 0 <= new_x < 8 and 0 <= new_y < 8
-           and 6 < chess_board[new_x][new_y] < 13
+        and 6 < chess_board[new_x][new_y] < 13
     ])
 
     return white_pawn_moves
@@ -513,14 +514,14 @@ def black_pawn_movement(chess_board, x, y):
         [x, y, new_x, new_y]
         for new_x, new_y in precomputed_moves
         if new_y == y and 8 > new_x >= 0 == chess_board[new_x][new_y]
-           and not (x == 1 and new_x == x + 2 and chess_board[x + 1][y] != 0)
+        and not (x == 1 and new_x == x + 2 and chess_board[x + 1][y] != 0)
     ])
 
     black_pawn_moves.extend([
         [x, y, new_x, new_y]
         for new_x, new_y in precomputed_moves
         if abs(new_y - y) == 1 and 0 <= new_x < 8 and 0 <= new_y < 8
-           and 0 < chess_board[new_x][new_y] < 7
+        and 0 < chess_board[new_x][new_y] < 7
     ])
     return black_pawn_moves
 
@@ -546,7 +547,11 @@ def white_knight_movement(chess_board, x, y):
     white_knight_moves.extend([
         [x, y, new_x, new_y]
         for new_x, new_y in precomputed_moves
-        if chess_board[x][y] == 0
+        if chess_board[new_x][new_y] == 0
+    ])
+    white_knight_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
         if 6 < chess_board[new_x][new_y] < 13
     ])
 
@@ -560,7 +565,11 @@ def black_knight_movement(chess_board, x, y):
     black_knight_moves.extend([
         [x, y, new_x, new_y]
         for new_x, new_y in precomputed_moves
-        if chess_board[x][y] == 0
+        if chess_board[new_x][new_y] == 0
+    ])
+    black_knight_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
         if 0 < chess_board[new_x][new_y] < 7
     ])
 
@@ -649,23 +658,12 @@ def white_vertical_movement(chess_board, x, y):
     white_vertical_moves = []
     precomputed_moves = precomputed_vertical_moves[(x, y)]
 
-    for new_x, new_y in precomputed_moves["down"]:
-        if chess_board[new_x][new_y] == 0:
-            white_vertical_moves.append([x, y, new_x, new_y])
-        elif 6 < chess_board[new_x][new_y] < 13:
-            white_vertical_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
-
-    for new_x, new_y in precomputed_moves["up"]:
-        if chess_board[new_x][new_y] == 0:
-            white_vertical_moves.append([x, y, new_x, new_y])
-        elif 6 < chess_board[new_x][new_y] < 13:
-            white_vertical_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
+    white_vertical_moves.extend(
+        chain(
+            generate_white_directional_moves(chess_board, x, y, precomputed_moves["up"]),
+            generate_white_directional_moves(chess_board, x, y, precomputed_moves["down"])
+        )
+    )
 
     return white_vertical_moves
 
@@ -674,23 +672,12 @@ def black_vertical_movement(chess_board, x, y):
     black_vertical_moves = []
     precomputed_moves = precomputed_vertical_moves[(x, y)]
 
-    for new_x, new_y in precomputed_moves["down"]:
-        if chess_board[new_x][new_y] == 0:
-            black_vertical_moves.append([x, y, new_x, new_y])
-        elif 0 < chess_board[new_x][new_y] < 7:
-            black_vertical_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
-
-    for new_x, new_y in precomputed_moves["up"]:
-        if chess_board[new_x][new_y] == 0:
-            black_vertical_moves.append([x, y, new_x, new_y])
-        elif 0 < chess_board[new_x][new_y] < 7:
-            black_vertical_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
+    black_vertical_moves.extend(
+        chain(
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["up"]),
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["down"])
+        )
+    )
 
     return black_vertical_moves
 
@@ -734,38 +721,14 @@ def white_diagonal_movement(chess_board, x, y):
     white_diagonal_moves = []
     precomputed_moves = precomputed_diagonal_moves[(x, y)]
 
-    for new_x, new_y in precomputed_moves["up_left"]:
-        if chess_board[new_x][new_y] == 0:
-            white_diagonal_moves.append([x, y, new_x, new_y])
-        elif 6 < chess_board[new_x][new_y] < 13:
-            white_diagonal_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
-    for new_x, new_y in precomputed_moves["up_right"]:
-        if chess_board[new_x][new_y] == 0:
-            white_diagonal_moves.append([x, y, new_x, new_y])
-        elif 6 < chess_board[new_x][new_y] < 13:
-            white_diagonal_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
-    for new_x, new_y in precomputed_moves["down_left"]:
-        if chess_board[new_x][new_y] == 0:
-            white_diagonal_moves.append([x, y, new_x, new_y])
-        elif 6 < chess_board[new_x][new_y] < 13:
-            white_diagonal_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
-    for new_x, new_y in precomputed_moves["down_right"]:
-        if chess_board[new_x][new_y] == 0:
-            white_diagonal_moves.append([x, y, new_x, new_y])
-        elif 6 < chess_board[new_x][new_y] < 13:
-            white_diagonal_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
+    white_diagonal_moves.extend(
+        chain(
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["up_right"]),
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["up_left"]),
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["down_right"]),
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["down_left"])
+        )
+    )
 
     return white_diagonal_moves
 
@@ -774,58 +737,46 @@ def black_diagonal_movement(chess_board, x, y):
     black_diagonal_moves = []
     precomputed_moves = precomputed_diagonal_moves[(x, y)]
 
-    for new_x, new_y in precomputed_moves["up_left"]:
-        if chess_board[new_x][new_y] == 0:
-            black_diagonal_moves.append([x, y, new_x, new_y])
-        elif 0 < chess_board[new_x][new_y] < 7:
-            black_diagonal_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
-    for new_x, new_y in precomputed_moves["up_right"]:
-        if chess_board[new_x][new_y] == 0:
-            black_diagonal_moves.append([x, y, new_x, new_y])
-        elif 0 < chess_board[new_x][new_y] < 7:
-            black_diagonal_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
-    for new_x, new_y in precomputed_moves["down_left"]:
-        if chess_board[new_x][new_y] == 0:
-            black_diagonal_moves.append([x, y, new_x, new_y])
-        elif 0 < chess_board[new_x][new_y] < 7:
-            black_diagonal_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
-    for new_x, new_y in precomputed_moves["down_right"]:
-        if chess_board[new_x][new_y] == 0:
-            black_diagonal_moves.append([x, y, new_x, new_y])
-        elif 0 < chess_board[new_x][new_y] < 7:
-            black_diagonal_moves.append([x, y, new_x, new_y])
-            break
-        else:
-            break
+    black_diagonal_moves.extend(
+        chain(
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["up_right"]),
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["up_left"]),
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["down_right"]),
+            generate_black_directional_moves(chess_board, x, y, precomputed_moves["down_left"])
+        )
+    )
 
     return black_diagonal_moves
 
 
+def precompute_king_moves():
+    for x in range(8):
+        for y in range(8):
+            moves = []
+            king_moves = [(1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1)]
+            for (j, k) in king_moves:
+                if 7 >= x + j >= 0 and 7 >= y + k >= 0:
+                    if chess_board[x + j][y + k] == 0:
+                        moves.append((x + j, y + k))
+
+            precomputed_king_moves[(x, y)] = moves
+
+
 def white_king_movement(chess_board, x, y):
     white_king_moves = []
+    precomputed_moves = precomputed_king_moves[(x, y)]
 
-    king_moves = [(1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1)]
+    white_king_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if chess_board[new_x][new_y] == 0
+    ])
 
-    for (j, k) in king_moves:
-        new_x, new_y = x + j, y + k
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                white_king_moves.append([x, y, new_x, new_y])
-            if 6 < chess_board[new_x][new_y] < 13:
-                temp_board = simulate_move(chess_board, [x, y, new_x, new_y])
-                if not is_king_in_check(temp_board, True):
-                    white_king_moves.append([x, y, new_x, new_y])
-                else:
-                    continue
+    white_king_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if 6 < chess_board[new_x][new_y] < 13
+    ])
 
     return white_king_moves
 
@@ -862,28 +813,26 @@ def long_castling_white(chess_board, king_x, king_y):
 
 def black_king_movement(chess_board, x, y):
     black_king_moves = []
-    king_moves = [(1, 0), (1, 1), (1, -1), (0, 1), (0, -1), (-1, 0), (-1, 1), (-1, -1)]
+    precomputed_moves = precomputed_king_moves[(x, y)]
 
-    for (j, k) in king_moves:
-        new_x, new_y = x + j, y + k
-        if 0 <= new_x < 8 and 0 <= new_y < 8:
-            if chess_board[new_x][new_y] == 0:
-                black_king_moves.append([x, y, new_x, new_y])
-            if 0 < chess_board[new_x][new_y] < 7:
-                temp_board = simulate_move(chess_board, [x, y, new_x, new_y])
-                """for i in range(8):
-                    print(temp_board[i])"""
-                if not is_king_in_check(temp_board, False):
-                    black_king_moves.append([x, y, new_x, new_y])
-                else:
-                    continue
+    black_king_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if chess_board[new_x][new_y] == 0
+    ])
+
+    black_king_moves.extend([
+        [x, y, new_x, new_y]
+        for new_x, new_y in precomputed_moves
+        if 0 < chess_board[new_x][new_y] < 7
+    ])
 
     return black_king_moves
 
 
 def short_castling_black(chess_board, king_x, king_y):
     w_possible_moves = get_white_possible_moves(chess_board)
-    filtered_moves = [move for moves in w_possible_moves for move in moves]
+    filtered_moves = [move for moves in [w_possible_moves] for move in moves]
     castle_squares = [[0, 4], [0, 5], [0, 6]]
 
     if chess_board[0][5] == 0 and chess_board[0][6] == 0:
@@ -898,7 +847,7 @@ def short_castling_black(chess_board, king_x, king_y):
 
 def long_castling_black(chess_board, king_x, king_y):
     w_possible_moves = get_white_possible_moves(chess_board)
-    filtered_moves = [move for moves in w_possible_moves for move in moves]
+    filtered_moves = [move for moves in [w_possible_moves] for move in moves]
     castle_squares = [[0, 4], [0, 3], [0, 2]]
     if chess_board[0][1] == 0 and chess_board[0][2] == 0 and chess_board[0][3] == 0:
         if all(square not in [[move[2], move[3]] for move in filtered_moves] for square in castle_squares):
@@ -1124,7 +1073,7 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
         for move in check_moves:
             temp_board = simulate_move(chess_board, move)
             if is_check_mate(temp_board, is_white_turn):
-                forced_mate_eval = minimax(temp_board, 3, not is_white_turn, alpha, beta)
+                forced_mate_eval = minimax(temp_board, depth, not is_white_turn, alpha, beta)
                 if forced_mate_eval == float('inf'):
                     return move
 
@@ -1182,7 +1131,7 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
         for move in check_moves:
             temp_board = simulate_move(chess_board, move)
             if is_check_mate(temp_board, is_white_turn):
-                forced_mate_eval = minimax(temp_board, 3, not is_white_turn, alpha, beta)
+                forced_mate_eval = minimax(temp_board, depth, not is_white_turn, alpha, beta)
                 if forced_mate_eval == float('-inf'):
                     return move
 
@@ -1223,7 +1172,6 @@ def find_best_move(chess_board, is_white_turn, depth, eval_diff=0.05):
                 break
 
     if top_moves:
-        print("roar", top_moves)
         best_move = random.choice(top_moves)
     else:
         if is_white_turn:
@@ -1413,7 +1361,7 @@ def start_game():
     precompute_horizontal_moves()
     precompute_vertical_moves()
     precompute_diagonal_moves()
-    # precompute_king_moves()
+    precompute_king_moves()
 
     game_loop(screen, chess_board, depth)
 
@@ -1435,6 +1383,7 @@ if __name__ == '__main__':
 
     start_game()
 
+    profiler.dump_stats("datei.prof")
     profiler.disable()
     stats = pstats.Stats(profiler).sort_stats('ncalls')
     stats.print_stats()
